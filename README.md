@@ -2,6 +2,8 @@
 
 **Explainable resume screening for recruiters, and honest resume coaching for candidates.**
 
+**Live demo: [resume-intelligence-hg1g.onrender.com](https://resume-intelligence-hg1g.onrender.com)**: click *Try with sample data*, no signup. (Free hosting: the first load can take 30–60 seconds.)
+
 [![CI](https://github.com/OmkarG-Star/AI-resume-analyzer/actions/workflows/ci.yml/badge.svg)](https://github.com/OmkarG-Star/AI-resume-analyzer/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/Python-3.11-3776AB)
 ![FastAPI](https://img.shields.io/badge/FastAPI-API-009688)
