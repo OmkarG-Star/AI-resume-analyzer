@@ -1,0 +1,22 @@
+HR Data Analyst
+
+About the role
+Join the People team to turn workforce data into clear reporting for leaders across the business.
+
+What you will do
+- Own monthly headcount, attrition and hiring dashboards
+- Answer ad-hoc questions from HR business partners with SQL and Excel
+- Improve data quality in the HRMS and document metric definitions
+- Present findings to managers in plain language
+
+Requirements
+- 1+ years of experience in data or HR analytics
+- Strong SQL and Excel
+- Dashboards in Power BI or Tableau
+- Data cleaning and data visualization
+- Clear written and verbal communication
+
+Nice to have
+- Python (Pandas) for automation
+- Statistics fundamentals
+- Experience with HR analytics or people analytics

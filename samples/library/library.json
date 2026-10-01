@@ -1,0 +1,7 @@
+[
+  {"file": "data_scientist.txt", "title": "Data Scientist, People Analytics", "department": "People Analytics", "location": "Pune · Hybrid", "employment_type": "Full-time", "status": "Open", "hiring_manager": "Priya Raman", "openings": 2},
+  {"file": "data_engineer.txt", "title": "Data Engineer", "department": "Data Platform", "location": "Bengaluru · Remote", "employment_type": "Full-time", "status": "Open", "hiring_manager": "Vikram Joshi", "openings": 1},
+  {"file": "ml_engineer.txt", "title": "Machine Learning Engineer", "department": "ML Platform", "location": "Mumbai · On-site", "employment_type": "Full-time", "status": "Open", "hiring_manager": "Neha Kapoor", "openings": 1},
+  {"file": "hr_data_analyst.txt", "title": "HR Data Analyst", "department": "People Operations", "location": "Pune · Hybrid", "employment_type": "Contract", "status": "On hold", "hiring_manager": "Rahul Menon", "openings": 1},
+  {"file": "analytics_engineer.txt", "title": "Analytics Engineer", "department": "Finance Data", "location": "Hyderabad · Hybrid", "employment_type": "Full-time", "status": "Closed", "hiring_manager": "Anita D'Souza", "openings": 1}
+]

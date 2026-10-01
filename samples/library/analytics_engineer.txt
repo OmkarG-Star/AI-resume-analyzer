@@ -1,0 +1,19 @@
+Analytics Engineer
+
+About the role
+Build the trusted data models that every dashboard in the company depends on.
+
+What you will do
+- Model raw event and finance data into clean marts with dbt
+- Write tests and documentation for every model
+- Partner with analysts to define metrics once and reuse them
+
+Requirements
+- 2+ years of experience in analytics engineering or BI
+- Expert SQL and dbt
+- Cloud data warehouse experience (Snowflake or BigQuery)
+- Data modeling (star schema) and Git
+
+Nice to have
+- Python and Airflow
+- Looker or Power BI

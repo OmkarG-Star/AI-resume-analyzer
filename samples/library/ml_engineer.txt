@@ -1,0 +1,23 @@
+Machine Learning Engineer
+
+About the role
+Our ML platform team ships the models behind pricing, search ranking and demand forecasting. You will take models from notebook to production and keep them healthy.
+
+What you will do
+- Package and deploy models as low-latency services
+- Build training pipelines with experiment tracking and automated evaluation
+- Monitor drift and model quality in production and lead retraining
+- Work with data engineers on feature pipelines
+
+Requirements
+- 3+ years of experience building machine learning systems
+- Strong Python and SQL
+- PyTorch or TensorFlow, plus Scikit-learn
+- Model deployment with FastAPI or Flask and Docker
+- MLOps practices: MLflow, CI/CD and Git
+- Bachelor's degree in computer science or a related field
+
+Nice to have
+- Kubernetes and AWS or GCP
+- Experience with NLP or LLMs
+- Spark for large-scale feature engineering

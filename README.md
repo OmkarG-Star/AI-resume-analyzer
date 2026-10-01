@@ -25,7 +25,19 @@ exactly which changes raise their score and by how much.
 
 ---
 
-## Two workspaces
+## Three workspaces
+
+### Company: job library
+- One place for every role the company is hiring for: **create, edit, duplicate, close or delete** job descriptions.
+- Each job keeps its team, location, employment type, hiring manager, openings and status (**Open · On hold · Closed**).
+- **Live requirement preview** while you write: see the must-haves, nice-to-haves and minimum experience the screener will use, with warnings when a description has no clear requirements or too many must-haves.
+- **Screen candidates against a saved job in one click.** Each screening adds to the job's counts (screenings, resumes screened, shortlisted).
+- Filter by status, search by title, team, location or skill.
+- Only job descriptions and counts are saved (SQLite, `JOBS_DB`); resumes are never stored.
+
+| Job library | Job editor with live preview |
+|---|---|
+| ![Job library with open, on-hold and closed roles](docs/screenshots/library.png) | ![Editing a job with the parsed requirements beside it](docs/screenshots/job_editor.png) |
 
 ### Recruiter: screen candidates
 - Upload a job description and up to 50 resumes (**PDF, DOCX, TXT**).
@@ -81,7 +93,7 @@ Parts that don't apply (e.g. no education requirement) are dropped and the rest 
 
 - **Decision support, not a decision.** Keyword-based scoring misses career changers, unusual titles and context. A person should review every rejection.
 - **No personal attributes.** Name, gender, age, photo and address are never used. Blind mode hides names, and emails and phone numbers are masked in any quoted text.
-- **Nothing is stored.** Uploads are processed in memory and discarded. There is no database and no logging of resume content.
+- **Resumes are never stored.** Uploads are processed in memory and discarded, with no logging of resume content. The only database is the company job library: job descriptions plus screening counts.
 - **Honest coaching.** The candidate view never suggests claiming skills you don't have, and rewrites use placeholders rather than invented numbers.
 
 ---
@@ -99,9 +111,10 @@ src/resume_ai/
   skills.py          taxonomy, aliases, implications, span matching
   jd.py              must-have / nice-to-have split, either-or groups, years, education, seniority
   engine.py          features, 7-part score, verdicts, reasons, questions, suggestions, rewrites
-  api.py             FastAPI: /api/analyze, /api/screen, /api/screen/export, /api/parse-file
-samples/             2 job descriptions and 6 fictional resumes
-tests/               27 pytest tests (parsing, skills, JD, engine, API incl. PDF/DOCX upload)
+  store.py           job library: SQLite CRUD for job descriptions and screening counts
+  api.py             FastAPI: analyze, screen, export, parse-file, /api/jobs CRUD
+samples/             job descriptions, seed job library and 6 fictional resumes
+tests/               31 pytest tests (parsing, skills, JD, engine, API, job library)
 legacy/              the original Streamlit + TF-IDF version, kept for comparison
 ```
 
@@ -145,9 +158,18 @@ curl -X POST localhost:8000/api/analyze -H 'content-type: application/json' \
 | `POST /api/screen/export` | The ranked shortlist as CSV |
 | `POST /api/parse-file` | Extract text from a PDF, DOCX or TXT upload |
 | `GET /api/samples` | Demo job descriptions and resumes |
+| `GET /api/jobs` · `POST /api/jobs` | List the job library (with parsed requirements) · add a job |
+| `GET / PUT / DELETE /api/jobs/{id}` | Read, edit or remove a job |
+| `POST /api/jobs/{id}/duplicate` | Copy a job as an On hold draft |
+| `POST /api/jobs/preview` | Parse a description without saving it |
+
+`POST /api/screen` also accepts `job_id` to record the screening against a saved job.
+
+The library lives in SQLite at `JOBS_DB` (default `data/jobs.db`) and is seeded with five sample roles when empty. On hosts with a temporary filesystem, such as Render's free plan, it resets to those roles on restart; point `JOBS_DB` at a persistent disk to keep it.
 
 ## Version history
 
+- **v2.1**: company job library: saved job descriptions with status, team and openings, live requirement preview, one-click screening and per-job counts.
 - **v2.0**: rebuilt as a two-sided product: structured job parsing, evidence-weighted scoring, verdicts with reasons, interview kit, candidate coaching with measured gains, premium web UI, tests and CI.
 - **v1.0** (`legacy/`): Streamlit app with TF-IDF cosine similarity and a fixed 28-skill list.
 

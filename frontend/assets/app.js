@@ -15,7 +15,10 @@ const App = (() => {
     view: store.get('ri2-view') || 'board', q: '', drawer: null, tab: 'overview', compare: new Set(),
     imp: { resume: { name: '', text: '' }, job: '', result: null, base: null, assume: new Set() },
     samples: null, busy: false,
+    jobs: null, jobMeta: { statuses: ['Open', 'On hold', 'Closed'], employment_types: ['Full-time', 'Part-time', 'Contract', 'Internship'] },
+    jobFilter: store.get('ri2-jobfilter') || 'All', jobQ: '', editor: null, confirm: null,
   };
+  const ST = { 'Open': { cls: 'st-open', icon: 'check' }, 'On hold': { cls: 'st-hold', icon: 'pause' }, 'Closed': { cls: 'st-closed', icon: 'archive' } };
 
   const VERD = {
     strong:    { label: 'Strong shortlist',    cls: 'v-strong',    c: 'var(--green)', icon: 'star' },
@@ -35,9 +38,10 @@ const App = (() => {
   };
 
   /* ---------------------------------------------------------------- utils */
-  async function api(path, body) {
+  async function api(path, body, method) {
     const opt = body instanceof FormData ? { method: 'POST', body }
-      : body ? { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) } : {};
+      : body ? { method: method || 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }
+      : method ? { method } : {};
     const r = await fetch(path, opt);
     if (!r.ok) {
       let d = r.statusText;
@@ -75,6 +79,22 @@ const App = (() => {
   const initials = c => S.blind ? c.id : (c.name_guess || c.label).split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase();
   const avatar = (c, i) => `<span class="avatar" style="--av:${AV[(parseInt(c.id.slice(1)) - 1) % AV.length]}">${esc(initials(c))}</span>`;
 
+  function ago(iso) {
+    if (!iso) return '';
+    const s = (Date.now() - new Date(iso).getTime()) / 1000;
+    if (s < 60) return 'just now';
+    const units = [[86400 * 30, 'month'], [86400 * 7, 'week'], [86400, 'day'], [3600, 'hour'], [60, 'minute']];
+    for (const [n, u] of units) if (s >= n) { const v = Math.floor(s / n); return `${v} ${u}${v > 1 ? 's' : ''} ago`; }
+  }
+
+  async function loadJobs() {
+    const r = await api('/api/jobs');
+    S.jobs = r.jobs; S.jobMeta = { statuses: r.statuses, employment_types: r.employment_types };
+    return S.jobs;
+  }
+  const jobById = id => (S.jobs || []).find(j => j.id === +id);
+  const stPill = st => `<span class="pill ${ST[st].cls}"><i class="dot"></i>${esc(st)}</span>`;
+
   async function samples() {
     if (!S.samples) S.samples = await api('/api/samples');
     return S.samples;
@@ -98,6 +118,7 @@ const App = (() => {
 
   /* ---------------------------------------------------------------- routing */
   const ROUTES = {
+    jobs: { title: 'Job library', crumb: 'Company workspace' },
     screen: { title: 'Screen candidates', crumb: 'Recruiter workspace' },
     improve: { title: 'Improve a resume', crumb: 'Candidate workspace' },
     method: { title: 'How scoring works', crumb: 'Learn' },
@@ -111,15 +132,21 @@ const App = (() => {
     $('top-actions').innerHTML = topActions(r);
     const page = $('page');
     page.classList.remove('enter');
-    page.innerHTML = r === 'screen' ? (S.screen ? screenResults() : screenSetup())
+    page.innerHTML = r === 'jobs' ? jobsPage() : r === 'screen' ? (S.screen ? screenResults() : screenSetup())
       : r === 'improve' ? (S.imp.result ? improveResults() : improveSetup()) : method();
     document.title = `${ROUTES[r].title} · Resume Intelligence`;
     $('shell').classList.remove('menu');
     renderOverlays();
     if (anim) animate();
+    if (S.jobs === null && !S.jobsLoading) {
+      S.jobsLoading = true;
+      loadJobs().then(() => { S.jobsLoading = false; if (['jobs', 'screen', 'improve'].includes(route()) && !S.editor) render(route() === 'jobs'); })
+        .catch(e => { S.jobsLoading = false; S.jobs = []; toast(e.message, true); });
+    }
   }
 
   function topActions(r) {
+    if (r === 'jobs') return `<button class="btn btn-sm btn-primary" data-act="new-job" title="New job">${I('plus', 15)}<span class="lbl">New job</span></button>`;
     if (r === 'screen' && S.screen) return `
       <button class="btn btn-sm btn-ghost" data-act="edit-inputs" title="Edit inputs">${I('arrowLeft', 15)}<span class="lbl">Edit inputs</span></button>
       <button class="btn btn-sm" data-act="export" title="Export CSV">${I('download', 15)}<span class="lbl">Export CSV</span></button>`;
@@ -155,16 +182,14 @@ const App = (() => {
     <div class="grid g2" style="margin-top:18px">
       <section class="card anim">
         <div class="card-head"><div><h2><span class="step-n ${S.job.text.trim().length > 20 ? 'done' : ''}">${S.job.text.trim().length > 20 ? I('check', 14) : 1}</span>Job description</h2>
-          <p>Paste the advert or upload it. Must-haves and nice-to-haves are detected automatically.</p></div></div>
+          <p>Pick a saved role from your job library, or paste a one-off advert. Must-haves are detected automatically.</p></div></div>
         <div class="card-body">
-          <div class="row" style="margin-bottom:10px">
-            <span class="small muted">Use a sample:</span>
-            <button class="chip outline" data-act="sample-job" data-i="0">${I('briefcase', 13)} Data Engineer</button>
-            <button class="chip outline" data-act="sample-job" data-i="1">${I('briefcase', 13)} Data Scientist</button>
-            <span class="spacer" style="flex:1"></span>
+          <div class="row picker" style="margin-bottom:10px">
+            ${jobSelect('job-pick', S.job.id, 'Paste or upload a one-off job')}
             <button class="btn btn-sm btn-ghost" data-act="upload-job">${I('upload', 14)} Upload</button>
           </div>
-          <textarea id="job-text" placeholder="Paste the job description here…" aria-label="Job description">${esc(S.job.text)}</textarea>
+          <textarea id="job-text" placeholder="Paste the job description here, or pick a saved job above…" aria-label="Job description">${esc(S.job.text)}</textarea>
+          <div id="job-link" class="job-link">${jobLink()}</div>
         </div>
       </section>
 
@@ -187,7 +212,7 @@ const App = (() => {
     <div class="cta-bar anim">
       <div class="row"><span class="hic">${I('users')}</span>
         <div><b>${ready ? `Ready to screen ${S.resumes.length} candidate${S.resumes.length > 1 ? 's' : ''}` : 'Add a job description and at least one resume'}</b>
-          <div class="small muted">Takes a second. Nothing leaves this session or gets stored.</div></div></div>
+          <div class="small muted">Takes a second. Resumes are analysed in memory and never stored.</div></div></div>
       <button class="btn btn-lg btn-grad" data-act="run-screen" ${ready ? '' : 'disabled'}>${I('spark', 16)} Screen candidates</button>
     </div>`;
   }
@@ -204,8 +229,9 @@ const App = (() => {
     const kpi = (k, label, v, c, help) => `<div class="kpi anim" style="--c:${c}"><div class="k">${I(k, 14)}${label}${help ? tip(help) : ''}</div><div class="v" data-count>${v}</div></div>`;
     return `
     <div class="page-head anim">
-      <div><h1>${esc(j.title || 'Screening results')}</h1>
+      <div><h1>${esc((d.job_id && S.job.name) || j.title || 'Screening results')}</h1>
         <div class="row" style="margin-top:8px">
+          ${d.job_id ? `<a class="chip outline" href="#/jobs">${I('folder', 13)}From job library</a>` : ''}
           ${j.seniority ? `<span class="chip">${I('briefcase', 13)}${esc(j.seniority)}</span>` : ''}
           ${j.min_years ? `<span class="chip">${I('clock', 13)}${j.min_years}+ years</span>` : ''}
           ${j.education ? `<span class="chip">${I('cap', 13)}${esc(j.education)}</span>` : ''}
@@ -379,10 +405,220 @@ const App = (() => {
         <button class="btn btn-sm btn-ghost" style="color:#fff" data-act="clear-compare">Clear</button></div>`);
       if (S.compareOpen) add(compareModal());
     }
+    if (S.editor) add(editorModal());
+    if (S.confirm) add(confirmModal());
+    document.body.classList.toggle('modal-open', !!(S.editor || S.confirm));
     if (S.drawer && S.drawer !== S.lastDrawer) animate();
     else document.querySelectorAll('.ov [data-count], .ov .ring-arc').forEach(n => { n.dataset.done = '1'; n.style.animation = 'none'; });
     S.lastDrawer = S.drawer;
   }
+
+  /* ---------------------------------------------------------------- job library */
+  function jobSelect(id, current, blank, openOnly) {
+    const jobs = (S.jobs || []).filter(j => !openOnly || j.status !== 'Closed');
+    const groups = S.jobMeta.statuses.filter(st => st !== 'Closed' || !openOnly).map(st => {
+      const list = jobs.filter(j => j.status === st);
+      return list.length ? `<optgroup label="${esc(st)}">${list.map(j => `<option value="${j.id}" ${+current === j.id ? 'selected' : ''}>${esc(j.title)}${j.department && !j.title.includes(j.department) ? ` · ${esc(j.department)}` : ''}</option>`).join('')}</optgroup>` : '';
+    }).join('');
+    return `<label class="select-wrap">${I('folder', 15)}<select id="${id}" aria-label="Pick a job from the library">
+      <option value="">${S.jobs === null ? 'Loading job library…' : esc(blank)}</option>${groups}</select></label>`;
+  }
+
+  function jobLink() {
+    if (S.job.id) {
+      const j = jobById(S.job.id);
+      return `<span class="small muted">${I('folder', 13)} Saved job${j ? ` · ${esc(j.status)}` : ''}. Screening adds to its counts in the library.</span>
+        <button class="btn btn-sm btn-ghost" data-act="edit-job" data-id="${S.job.id}">${I('edit', 14)} Edit job</button>`;
+    }
+    if (S.job.text.trim().length > 40) return `<span class="small muted">${I('info', 13)} One-off job, not saved.</span>
+        <button class="btn btn-sm btn-ghost" data-act="save-to-library">${I('plus', 14)} Save to job library</button>`;
+    return '';
+  }
+
+  function jobsList() {
+    const q = S.jobQ.toLowerCase();
+    return (S.jobs || []).filter(j => (S.jobFilter === 'All' || j.status === S.jobFilter)
+      && (!q || [j.title, j.department, j.location, j.hiring_manager, ...j.summary.must, ...j.summary.nice].join(' ').toLowerCase().includes(q)));
+  }
+
+  function jobsPage() {
+    if (S.jobs === null) return `<div class="page-head"><div><h1>Job library</h1><p>Loading…</p></div></div>
+      <div class="jobs-grid">${[0, 1, 2].map(() => '<div class="sk" style="height:260px"></div>').join('')}</div>`;
+    const all = S.jobs, open = all.filter(j => j.status === 'Open');
+    const sum = k => all.reduce((a, j) => a + (j[k] || 0), 0);
+    const kpi = (k, label, v, c, help) => `<div class="kpi anim" style="--c:${c}"><div class="k">${I(k, 14)}${label}${help ? tip(help) : ''}</div><div class="v" data-count>${v}</div></div>`;
+    const count = st => st === 'All' ? all.length : all.filter(j => j.status === st).length;
+    return `
+    <div class="page-head anim">
+      <div><h1>Job library</h1><p>Every role the company is hiring for, in one place. Save a job description once, edit it as the role changes,
+        and screen new applicants against it in one click.</p></div>
+      <button class="btn btn-grad" data-act="new-job">${I('plus', 16)} New job</button>
+    </div>
+    <div class="kpis k4">
+      ${kpi('briefcase', 'Open roles', open.length, 'var(--iris)')}
+      ${kpi('users', 'Open positions', open.reduce((a, j) => a + j.openings, 0), 'var(--teal)', 'Headcount still to fill across open roles.')}
+      ${kpi('fileText', 'Resumes screened', sum('candidates_screened'), 'var(--amber)', 'Total across all screenings. Only the count is kept, never the resumes.')}
+      ${kpi('star', 'Shortlisted', sum('shortlisted'), 'var(--green)', 'Candidates who reached Strong shortlist or Shortlist.')}
+    </div>
+    <div class="toolbar">
+      <div class="seg" role="tablist">${['All', ...S.jobMeta.statuses].map(st => `<button class="${S.jobFilter === st ? 'on' : ''}" data-act="job-filter" data-f="${esc(st)}">${esc(st)}<span class="seg-n">${count(st)}</span></button>`).join('')}</div>
+      <label class="search">${I('search', 15)}<input type="search" id="jq" placeholder="Search title, team, location or skill" value="${esc(S.jobQ)}"></label>
+    </div>
+    <div id="jobs-results">${jobsGrid()}</div>
+    <div class="note anim" style="margin-top:18px">${I('lock')}<div><b>What is saved:</b> job descriptions and, for each job, how many resumes were screened and shortlisted.
+      Resumes and candidate details are never stored. <span class="muted">Demo note: on the free hosting plan the library resets to the sample roles when the server restarts.</span></div></div>`;
+  }
+
+  function jobsGrid() {
+    const list = jobsList();
+    if (!list.length) return `<div class="empty-state card">${I('folder', 28)}<b>${S.jobs.length ? 'No jobs match' : 'Your job library is empty'}</b>
+      <p class="small muted">${S.jobs.length ? 'Try another filter or search.' : 'Add the roles you are hiring for, then screen candidates against them.'}</p>
+      ${S.jobs.length ? '' : `<button class="btn btn-primary" data-act="new-job">${I('plus', 15)} New job</button>`}</div>`;
+    return `<div class="jobs-grid">${list.map((j, i) => jobCard(j, i)).join('')}</div>`;
+  }
+
+  function jobCard(j, i) {
+    const m = j.summary, more = m.must.length - 5;
+    const stat = (v, l) => `<div><b>${v}</b><span>${l}</span></div>`;
+    return `<article class="jcard anim ${j.status === 'Closed' ? 'closed' : ''}" style="--i:${i}">
+      <div class="jtop">
+        <span class="hic">${I('briefcase')}</span>
+        <div class="jtitle"><h3><a href="#" data-act="edit-job" data-id="${j.id}">${esc(j.title)}</a></h3>
+          <div class="small muted">${[j.department, j.location].filter(Boolean).map(esc).join(' · ') || 'No team or location yet'}</div></div>
+        ${stPill(j.status)}
+      </div>
+      <div class="jmeta">
+        <span>${I('clock', 13)}${m.min_years ? `${m.min_years}+ yrs` : 'Any experience'}</span>
+        <span>${I('users', 13)}${j.openings} opening${j.openings > 1 ? 's' : ''}</span>
+        <span>${I('calendar', 13)}${esc(j.employment_type)}</span>
+        ${m.seniority ? `<span>${I('gauge', 13)}${esc(m.seniority)}</span>` : ''}
+      </div>
+      <div class="jreq"><div class="tiny muted">${m.must.length} must-haves · ${m.nice.length} nice-to-haves</div>
+        <div class="chips">${m.must.slice(0, 5).map(s => `<span class="chip">${esc(s)}</span>`).join('')}${more > 0 ? `<span class="chip outline">+${more} more</span>` : ''}
+          ${m.must.length ? '' : `<span class="chip missing">${I('alert', 12)}No requirements found</span>`}</div></div>
+      <div class="jstats">${stat(j.screenings, 'screenings')}${stat(j.candidates_screened, 'screened')}${stat(j.shortlisted, 'shortlisted')}</div>
+      <div class="tiny muted jwhen">${j.last_screened_at ? `Last screened ${ago(j.last_screened_at)}` : 'Not screened yet'}${j.hiring_manager ? ` · Manager: ${esc(j.hiring_manager)}` : ''}</div>
+      <div class="jactions">
+        <button class="btn btn-sm btn-primary" data-act="screen-job" data-id="${j.id}" ${j.status === 'Closed' ? 'disabled title="Reopen the job to screen"' : ''}>${I('users', 14)} Screen</button>
+        <span style="flex:1"></span>
+        <select class="status-sel" data-job-status="${j.id}" aria-label="Status of ${esc(j.title)}">${S.jobMeta.statuses.map(st => `<option ${st === j.status ? 'selected' : ''}>${esc(st)}</option>`).join('')}</select>
+        <button class="icon-btn" data-act="edit-job" data-id="${j.id}" data-tip="Edit" aria-label="Edit">${I('edit', 16)}</button>
+        <button class="icon-btn" data-act="dup-job" data-id="${j.id}" data-tip="Duplicate" aria-label="Duplicate">${I('copy', 16)}</button>
+        <button class="icon-btn danger" data-act="del-job" data-id="${j.id}" data-tip="Delete" aria-label="Delete">${I('trash', 16)}</button>
+      </div>
+    </article>`;
+  }
+
+  function previewHtml(p) {
+    if (!p || (!p.must.length && !p.nice.length && !p.min_years)) return `
+      <div class="sec-title" style="margin-top:0">What the screener will check</div>
+      <div class="ed-empty">${I('target', 22)}<p class="small muted">Paste the description and the must-haves, nice-to-haves and minimum experience will appear here as you type.</p></div>
+      <div class="note" style="margin-top:12px">${I('info')}<div>Tip: put essentials under a <b>Requirements</b> heading and extras under <b>Nice to have</b>. Write “Power BI or Tableau” when either will do.</div></div>`;
+    const warn = !p.must.length ? 'No must-haves detected. Add a “Requirements” heading with one skill per line.'
+      : p.must.length > 14 ? `${p.must.length} must-haves is a lot: few candidates will match them all. Move the extras under “Nice to have”.` : '';
+    return `
+      <div class="sec-title" style="margin-top:0">What the screener will check</div>
+      <div class="ed-stats">
+        <div><span>Experience</span><b>${p.min_years ? `${p.min_years}+ years` : 'Not set'}</b></div>
+        <div><span>Education</span><b>${esc(p.education || 'Not set')}</b></div>
+        <div><span>Level</span><b>${esc(p.seniority || '—')}</b></div>
+      </div>
+      <div class="tiny muted" style="margin:14px 0 6px">Must-have (${p.must.length})</div>
+      <div class="chips">${p.must.map(s => `<span class="chip shown"><i class="dot"></i>${esc(s)}</span>`).join('') || '<span class="small muted">None yet</span>'}</div>
+      <div class="tiny muted" style="margin:14px 0 6px">Nice-to-have (${p.nice.length})</div>
+      <div class="chips">${p.nice.map(s => `<span class="chip"><i class="dot"></i>${esc(s)}</span>`).join('') || '<span class="small muted">None</span>'}</div>
+      ${warn ? `<div class="note warn" style="margin-top:14px">${I('alert')}<div>${esc(warn)}</div></div>` : ''}`;
+  }
+
+  function editorModal() {
+    const e = S.editor, f = e.f;
+    const opt = (arr, v) => arr.map(x => `<option ${x === v ? 'selected' : ''}>${esc(x)}</option>`).join('');
+    const inp = (k, label, ph = '', cls = '') => `<label class="fld ${cls}"><span class="label">${label}</span>
+      <input type="text" data-f="${k}" value="${esc(f[k] || '')}" placeholder="${esc(ph)}" maxlength="120"></label>`;
+    return `<div class="modal-scrim" data-act="close-editor"><div class="modal modal-form" role="dialog" aria-modal="true" aria-label="${e.id ? 'Edit job' : 'New job'}">
+      <div class="modal-head"><div><h2><span class="hic">${I('briefcase')}</span>${e.id ? 'Edit job' : 'New job'}</h2>
+        <p>${e.id ? `Last updated ${ago(jobById(e.id)?.updated_at) || ''}. Changes apply to future screenings.` : 'Saved to the company job library, ready to screen candidates against.'}</p></div>
+        <button class="icon-btn" data-act="close-editor" aria-label="Close">${I('x')}</button></div>
+      <div class="editor">
+        <div class="ed-form">
+          <div class="fgrid">
+            ${inp('title', 'Job title *', 'e.g. Senior Data Engineer', 'span2')}
+            <label class="fld"><span class="label">Openings</span><input type="number" data-f="openings" min="1" max="999" value="${esc(f.openings || 1)}"></label>
+            ${inp('department', 'Department', 'e.g. Data Platform')}
+            ${inp('location', 'Location', 'e.g. Pune · Hybrid')}
+            ${inp('hiring_manager', 'Hiring manager', 'Name')}
+            <label class="fld"><span class="label">Employment type</span><select data-f="employment_type">${opt(S.jobMeta.employment_types, f.employment_type)}</select></label>
+            <div class="fld span2"><span class="label">Status</span><div class="seg">${S.jobMeta.statuses.map(st => `<button type="button" class="${f.status === st ? 'on' : ''}" data-act="ed-status" data-s="${esc(st)}">${I(ST[st].icon, 14)}${esc(st)}</button>`).join('')}</div></div>
+          </div>
+          <div class="fld" style="margin-top:14px"><div class="row" style="justify-content:space-between;margin-bottom:6px"><span class="label" style="margin:0">Job description *</span>
+            <button type="button" class="btn btn-sm btn-ghost" data-act="upload-editor">${I('upload', 14)} Upload file</button></div>
+            <textarea data-f="description" placeholder="Paste the full advert: About the role, Responsibilities, Requirements, Nice to have…">${esc(f.description || '')}</textarea></div>
+        </div>
+        <aside class="ed-preview" id="ed-preview">${previewHtml(e.preview)}</aside>
+      </div>
+      <div class="modal-foot"><span class="small err-text" id="ed-err"></span>
+        <button class="btn btn-ghost" data-act="close-editor">Cancel</button>
+        <button class="btn btn-grad" data-act="save-job">${I('check', 15)} ${e.id ? 'Save changes' : 'Save job'}</button></div>
+    </div></div>`;
+  }
+
+  function confirmModal() {
+    const c = S.confirm;
+    return `<div class="modal-scrim" data-act="close-confirm"><div class="modal modal-sm" role="alertdialog" aria-modal="true" aria-label="Delete job">
+      <div class="confirm"><span class="hic danger">${I('trash', 18)}</span>
+        <div><h2>Delete “${esc(c.title)}”?</h2><p class="small muted" style="margin-top:6px">The job description and its screening counts are removed from the library. This can’t be undone.
+          ${c.status !== 'Closed' ? 'If the role is filled, you can set it to <b>Closed</b> instead and keep the history.' : ''}</p></div></div>
+      <div class="modal-foot">${c.status !== 'Closed' ? `<button class="btn btn-ghost" data-act="close-instead" data-id="${c.id}">${I('archive', 15)} Close instead</button>` : ''}
+        <span style="flex:1"></span><button class="btn" data-act="close-confirm">Cancel</button>
+        <button class="btn btn-danger" data-act="confirm-delete" data-id="${c.id}">${I('trash', 15)} Delete job</button></div>
+    </div></div>`;
+  }
+
+  let previewTimer = null, previewSeq = 0;
+  async function refreshPreview(now) {
+    clearTimeout(previewTimer);
+    const run = async () => {
+      if (!S.editor) return;
+      const seq = ++previewSeq;
+      try {
+        const p = await api('/api/jobs/preview', { description: S.editor.f.description || '' });
+        if (!S.editor || seq !== previewSeq) return;
+        S.editor.preview = p;
+        const box = $('ed-preview'); if (box) box.innerHTML = previewHtml(p);
+      } catch (e) { }
+    };
+    if (now) return run();
+    previewTimer = setTimeout(run, 350);
+  }
+
+  function openEditor(job, origin) {
+    const f = job ? { ...job } : { title: '', department: '', location: '', employment_type: 'Full-time', status: 'Open', hiring_manager: '', openings: 1, description: '' };
+    S.editor = { id: job?.id || null, f, preview: job?.summary || null, origin };
+    renderOverlays();
+    if (!job?.summary) refreshPreview(true);
+    setTimeout(() => document.querySelector('.modal-form [data-f="title"]')?.focus(), 60);
+  }
+
+  async function saveJob() {
+    const e = S.editor, f = e.f, err = $('ed-err');
+    const fail = m => { if (err) err.textContent = m; };
+    if (!String(f.title || '').trim()) return fail('Add a job title.');
+    if (String(f.description || '').trim().length < 40) return fail('Add the job description (at least a few lines).');
+    const body = {};
+    ['title', 'department', 'location', 'employment_type', 'status', 'hiring_manager', 'description'].forEach(k => body[k] = String(f[k] ?? ''));
+    body.openings = Math.max(1, Math.min(999, parseInt(f.openings) || 1));
+    const btn = document.querySelector('[data-act="save-job"]'); if (btn) { btn.disabled = true; btn.classList.add('busy'); }
+    try {
+      const saved = e.id ? await api(`/api/jobs/${e.id}`, body, 'PUT') : await api('/api/jobs', body);
+      await loadJobs();
+      if (e.origin === 'screen' || S.job.id === saved.id) S.job = { id: saved.id, name: saved.title, text: saved.description };
+      S.editor = null;
+      toast(e.id ? 'Job updated' : 'Job saved to the library');
+      render(false);
+    } catch (x) { fail(x.message); if (btn) { btn.disabled = false; btn.classList.remove('busy'); } }
+  }
+
+  function useJob(j) { S.job = { id: j.id, name: j.title, text: j.description }; }
 
   /* ---------------------------------------------------------------- improve */
   function improveSetup() {
@@ -404,8 +640,9 @@ const App = (() => {
       <section class="card anim">
         <div class="card-head"><div><h2><span class="step-n ${S.imp.job.trim().length > 20 ? 'done' : ''}">${S.imp.job.trim().length > 20 ? I('check', 14) : 2}</span>Target job</h2>
           <p>The job you are applying for. Advice is specific to it.</p></div>
-          <div class="row"><button class="chip outline" data-act="imp-sample-job" data-i="0">Data Engineer</button><button class="chip outline" data-act="imp-sample-job" data-i="1">Data Scientist</button></div></div>
-        <div class="card-body"><textarea id="imp-job" placeholder="Paste the job description…" aria-label="Job description">${esc(S.imp.job)}</textarea></div>
+</div>
+        <div class="card-body"><div class="row picker" style="margin-bottom:10px">${jobSelect('imp-job-pick', S.imp.jobId, 'Pick an open role, or paste one below', true)}</div>
+          <textarea id="imp-job" placeholder="Paste the job description…" aria-label="Job description">${esc(S.imp.job)}</textarea></div>
       </section>
     </div>
     <div class="cta-bar anim">
@@ -428,7 +665,7 @@ const App = (() => {
           <div class="score-hero">
             <div style="position:relative">${ring(r.score, 132, 12)}</div>
             <div>
-              <div class="row"><span class="small muted">Match score for</span><b>${esc(r.job.title || 'this job')}</b>
+              <div class="row"><span class="small muted">Match score for</span><b>${esc((S.imp.jobId && jobById(S.imp.jobId)?.title) || r.job.title || 'this job')}</b>
                 ${delta ? `<span class="delta ${delta < 0 ? 'neg' : ''}">${delta > 0 ? '+' : ''}${delta} from what-if</span>` : ''}</div>
               <h1 style="margin-top:6px;font-size:21px">A recruiter's tool would mark this <span style="color:${VERD[r.verdict.key].c}">${esc(r.verdict.label.toLowerCase())}</span>.</h1>
               <p class="small muted" style="margin-top:6px">${r.summary.must_matched} of ${r.job.must_units.length} must-haves · ${r.summary.years ?? 'no dated'} years · ${r.summary.quantified} of ${r.summary.bullets} bullets measurable</p>
@@ -514,7 +751,7 @@ const App = (() => {
       <section class="card anim" style="grid-column:1/-1"><div class="card-head"><div><h2><span class="hic">${I('shield')}</span>Fairness, privacy and limits</h2></div></div>
         <div class="card-body grid g3">
           <div><b>Blind by default</b><p class="small muted" style="margin-top:4px">Names are hidden behind candidate IDs. Name, gender, age, photo and address are never used in scoring.</p></div>
-          <div><b>Nothing stored</b><p class="small muted" style="margin-top:4px">Files are read in memory, analysed and discarded. There is no database and nothing is logged.</p></div>
+          <div><b>Resumes never stored</b><p class="small muted" style="margin-top:4px">Resumes are read in memory, analysed and discarded. Only the company’s job library is saved, with screening counts, never candidate data.</p></div>
           <div><b>Decision support, not a decision</b><p class="small muted" style="margin-top:4px">Keyword-style scoring misses context: career changers, unusual titles, scanned PDFs. A person should review every rejection.</p></div>
         </div></section>
     </div>`;
@@ -525,7 +762,8 @@ const App = (() => {
     const btn = document.querySelector('[data-act="run-screen"]');
     if (btn) { btn.disabled = true; btn.classList.add('busy'); btn.innerHTML = `${I('refresh', 16)} Screening…`; }
     try {
-      S.screen = await api('/api/screen', { job: S.job.text, resumes: S.resumes.map(r => ({ name: r.name, text: r.text })) });
+      S.screen = await api('/api/screen', { job: S.job.text, job_id: S.job.id || null, resumes: S.resumes.map(r => ({ name: r.name, text: r.text })) });
+      if (S.screen.job_id) loadJobs().catch(() => { });
       S.compare.clear(); S.drawer = null;
       render();
       toast(`Screened ${S.screen.candidates.length} candidates`);
@@ -551,8 +789,9 @@ const App = (() => {
         if (target === 'multi') {
           if (S.resumes.length >= 50) { toast('Up to 50 resumes at a time', true); break; }
           S.resumes.push({ name: r.name, text: r.text, words: r.words });
-        } else if (target === 'job') S.job = { name: r.name, text: r.text };
+        } else if (target === 'job') S.job = { id: null, name: r.name, text: r.text };
         else if (target === 'imp') S.imp.resume = { name: r.name, text: r.text };
+        else if (target === 'editor' && S.editor) { S.editor.f.description = r.text; await refreshPreview(true); if (!S.editor.f.title && S.editor.preview?.title) S.editor.f.title = S.editor.preview.title; return renderOverlays(); }
       } catch (e) { toast(`${f.name}: ${e.message}`, true); }
     }
     render(false);
@@ -569,9 +808,42 @@ const App = (() => {
       const card = ev.target.closest('[data-cand]');
       if (t) {
         const a = t.dataset.act;
+        if (t.classList.contains('modal-scrim') && ev.target !== t) return;  // clicks inside a modal body
         if (a !== 'upload-multi' || ev.target.tagName !== 'A') ev.preventDefault();
-        if (a === 'demo-screen') { const s = await samples(); S.job = { name: 'sample', text: s.jobs[1].text }; S.resumes = s.resumes.map(r => ({ ...r })); render(false); return runScreen(); }
-        if (a === 'sample-job') { const s = await samples(); S.job = { name: s.jobs[+t.dataset.i].id, text: s.jobs[+t.dataset.i].text }; return render(false); }
+        if (a === 'new-job') return openEditor(null, route() === 'screen' ? 'screen' : 'jobs');
+        if (a === 'edit-job') { const j = jobById(t.dataset.id); return j ? openEditor(j) : toast('Job not found', true); }
+        if (a === 'save-to-library') {
+          openEditor(null, 'screen'); S.editor.f.description = S.job.text; await refreshPreview(true);
+          if (S.editor.preview?.title) S.editor.f.title = S.editor.preview.title; return renderOverlays();
+        }
+        if (a === 'close-editor') { S.editor = null; return renderOverlays(); }
+        if (a === 'ed-status') { S.editor.f.status = t.dataset.s; t.parentNode.querySelectorAll('button').forEach(b => b.classList.toggle('on', b === t)); return; }
+        if (a === 'upload-editor') { pendingTarget = 'editor'; return $('file-one').click(); }
+        if (a === 'save-job') return saveJob();
+        if (a === 'job-filter') { S.jobFilter = t.dataset.f; store.set('ri2-jobfilter', S.jobFilter); return render(false); }
+        if (a === 'screen-job') { const j = jobById(t.dataset.id); if (!j) return;
+          useJob(j); S.screen = null; S.drawer = null; S.compare.clear();
+          if (route() === 'screen') render(); else location.hash = '#/screen';
+          return toast(S.resumes.length ? `${j.title} selected. Ready to screen.` : `${j.title} selected. Now add resumes.`); }
+        if (a === 'dup-job') {
+          try { const copy = await api(`/api/jobs/${t.dataset.id}/duplicate`, {}); await loadJobs(); render(false);
+            toast('Copied as a draft (On hold)'); return openEditor(jobById(copy.id)); } catch (e) { return toast(e.message, true); } }
+        if (a === 'del-job') { const j = jobById(t.dataset.id); S.confirm = { id: j.id, title: j.title, status: j.status }; return renderOverlays(); }
+        if (a === 'close-confirm') { S.confirm = null; return renderOverlays(); }
+        if (a === 'close-instead') {
+          try { await api(`/api/jobs/${t.dataset.id}`, { status: 'Closed' }, 'PUT'); S.confirm = null; await loadJobs(); render(false); return toast('Job closed. History kept.'); }
+          catch (e) { return toast(e.message, true); } }
+        if (a === 'confirm-delete') {
+          const id = +t.dataset.id;
+          try { await api(`/api/jobs/${id}`, null, 'DELETE'); } catch (e) { return toast(e.message, true); }
+          if (S.job.id === id) S.job.id = null;
+          if (S.imp.jobId === id) S.imp.jobId = null;
+          S.confirm = null; await loadJobs(); render(false); return toast('Job deleted');
+        }
+        if (a === 'demo-screen') { const s = await samples();
+          const lib = (S.jobs || []).find(j => j.status === 'Open' && /^data scientist/i.test(j.title));
+          if (lib) useJob(lib); else S.job = { id: null, name: 'sample', text: s.jobs[1].text }; S.resumes = s.resumes.map(r => ({ ...r })); render(false); return runScreen(); }
+        if (a === 'sample-job') { const s = await samples(); S.job = { id: null, name: s.jobs[+t.dataset.i].id, text: s.jobs[+t.dataset.i].text }; return render(false); }
         if (a === 'sample-resumes') { ev.stopPropagation(); const s = await samples(); S.resumes = s.resumes.map(r => ({ ...r })); return render(false); }
         if (a === 'upload-multi') { if (ev.target.closest('a')) return; pendingTarget = 'multi'; return $('file-multi').click(); }
         if (a === 'upload-job') { pendingTarget = 'job'; return $('file-one').click(); }
@@ -598,7 +870,7 @@ const App = (() => {
         if (a === 'copy-fb') { const c = S.screen.candidates.find(x => x.id === S.drawer);
           return copy('Thank you for applying. A few things that would strengthen your application:\n\n' + c.suggestions.slice(0, 4).map((s, i) => `${i + 1}. ${s.title}. ${s.detail}`).join('\n')); }
         if (a === 'copy') return copy(t.dataset.text);
-        if (a === 'demo-improve') { const s = await samples(); S.imp.resume = { name: s.resumes[3].name, text: s.resumes[3].text }; S.imp.job = s.jobs[1].text; S.imp.assume.clear(); render(false); return runImprove(); }
+        if (a === 'demo-improve') { const s = await samples(); S.imp.resume = { name: s.resumes[3].name, text: s.resumes[3].text }; S.imp.job = s.jobs[1].text; S.imp.jobId = null; S.imp.assume.clear(); render(false); return runImprove(); }
         if (a === 'imp-sample-job') { const s = await samples(); S.imp.job = s.jobs[+t.dataset.i].text; return render(false); }
         if (a === 'run-improve') { S.imp.assume.clear(); return runImprove(); }
         if (a === 'imp-reset') { S.imp.result = null; S.imp.base = null; S.imp.assume.clear(); return render(); }
@@ -609,18 +881,48 @@ const App = (() => {
     });
 
     document.addEventListener('keydown', ev => {
+      if (ev.key === 'Escape' && (S.confirm || S.editor)) { if (S.confirm) S.confirm = null; else S.editor = null; return renderOverlays(); }
       if (ev.key === 'Escape') { if (S.compareOpen) S.compareOpen = false; else if (S.drawer) S.drawer = null; else return; renderOverlays(); }
       if (ev.key === 'Enter' && ev.target.matches('[data-cand]')) { S.drawer = ev.target.dataset.cand; S.tab = 'overview'; renderOverlays(); }
       if ((ev.key === 'Enter' || ev.key === ' ') && ev.target.matches('.drop')) { ev.preventDefault(); pendingTarget = 'multi'; $('file-multi').click(); }
     });
 
     document.addEventListener('input', ev => {
-      if (ev.target.id === 'job-text') { S.job.text = ev.target.value; refreshCta(); }
+      if (ev.target.id === 'job-text') {
+        S.job.text = ev.target.value;
+        if (S.job.id && jobById(S.job.id)?.description !== S.job.text) S.job.id = null;
+        const l = $('job-link'); if (l) l.innerHTML = jobLink();
+        const pick = $('job-pick'); if (pick && !S.job.id) pick.value = '';
+        refreshCta();
+      }
+      if (ev.target.dataset?.f && S.editor && ev.target.closest('.modal-form')) {
+        S.editor.f[ev.target.dataset.f] = ev.target.value;
+        if (ev.target.dataset.f === 'description') refreshPreview();
+        const err = $('ed-err'); if (err) err.textContent = '';
+      }
+      if (ev.target.id === 'jq') { S.jobQ = ev.target.value; $('jobs-results').innerHTML = jobsGrid(); }
       if (ev.target.id === 'imp-resume') { S.imp.resume.text = ev.target.value; refreshCta(); }
-      if (ev.target.id === 'imp-job') { S.imp.job = ev.target.value; refreshCta(); }
+      if (ev.target.id === 'imp-job') { S.imp.job = ev.target.value; S.imp.jobId = null; const p = $('imp-job-pick'); if (p) p.value = ''; refreshCta(); }
       if (ev.target.id === 'q') { S.q = ev.target.value; $('results').innerHTML = S.view === 'board' ? board() : table(); }
     });
     document.addEventListener('change', ev => {
+      if (ev.target.id === 'job-pick') {
+        const j = jobById(ev.target.value);
+        if (j) useJob(j); else S.job = { id: null, name: '', text: '' };
+        return render(false);
+      }
+      if (ev.target.id === 'imp-job-pick') {
+        const j = jobById(ev.target.value);
+        S.imp.jobId = j ? j.id : null; S.imp.job = j ? j.description : '';
+        return render(false);
+      }
+      if (ev.target.dataset?.f === 'employment_type' && S.editor) S.editor.f.employment_type = ev.target.value;
+      if (ev.target.dataset?.jobStatus) {
+        const id = ev.target.dataset.jobStatus, status = ev.target.value;
+        api(`/api/jobs/${id}`, { status }, 'PUT').then(loadJobs).then(() => { render(false); toast(`Status set to ${status}`); })
+          .catch(e => { toast(e.message, true); render(false); });
+        return;
+      }
       if (ev.target.id === 'blind') { S.blind = ev.target.checked; store.set('ri2-blind', S.blind ? 'on' : 'off'); render(false); }
       if (ev.target.id === 'file-multi' || ev.target.id === 'file-one') { uploadFiles([...ev.target.files], pendingTarget); ev.target.value = ''; }
     });

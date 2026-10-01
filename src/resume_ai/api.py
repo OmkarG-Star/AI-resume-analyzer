@@ -1,7 +1,8 @@
 """HTTP API and the served web app.
 
-Stateless by design: uploads are read in memory, analysed and discarded.
-Nothing about a candidate is written to disk or logged.
+Resumes are read in memory, analysed and discarded: nothing about a candidate
+is written to disk or logged. The only thing stored is the company's job
+library (job descriptions plus screening counts), see store.py.
 
   GET  /api/health
   GET  /api/samples                  sample jobs and resumes for the demo
@@ -9,11 +10,20 @@ Nothing about a candidate is written to disk or logged.
   POST /api/analyze                  one resume vs one job (candidate mode)
   POST /api/screen                   many resumes vs one job (recruiter mode)
   POST /api/screen/export            the ranked shortlist as CSV
+  GET  /api/jobs                     the job library, each with its parsed requirements
+  POST /api/jobs                     add a job description
+  GET  /api/jobs/{id}                one job
+  PUT  /api/jobs/{id}                edit a job (any subset of fields)
+  DELETE /api/jobs/{id}              remove a job
+  POST /api/jobs/{id}/duplicate      copy a job as a draft (On hold)
+  POST /api/jobs/preview             parse a description without saving it
 """
 from __future__ import annotations
 
 import csv
 import io
+import json
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
@@ -22,7 +32,7 @@ from fastapi.responses import FileResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import __version__, engine
+from . import __version__, engine, store
 from . import jd as jdmod
 from .parsing import extract_text
 
@@ -33,7 +43,27 @@ MAX_FILE_BYTES = 5 * 1024 * 1024
 MAX_RESUMES = 50
 ALLOWED = (".pdf", ".docx", ".txt", ".md")
 
-app = FastAPI(title="Resume Intelligence", version=__version__,
+
+
+def seed_jobs() -> list[dict]:
+    meta = SAMPLES / "library" / "library.json"
+    if not meta.exists():
+        return []
+    out = []
+    for m in json.loads(meta.read_text(encoding="utf-8")):
+        m = dict(m)
+        m["description"] = (SAMPLES / "library" / m.pop("file")).read_text(encoding="utf-8")
+        out.append(m)
+    return out
+
+
+@asynccontextmanager
+async def lifespan(_app):
+    store.init(seed_jobs())
+    yield
+
+
+app = FastAPI(title="Resume Intelligence", version=__version__, lifespan=lifespan,
               docs_url="/api/docs", openapi_url="/api/openapi.json")
 app.add_middleware(GZipMiddleware, minimum_size=800)
 
@@ -52,6 +82,29 @@ class AnalyzeIn(BaseModel):
 class ScreenIn(BaseModel):
     job: str = Field(..., min_length=20, max_length=30_000)
     resumes: list[ResumeIn] = Field(..., min_length=1, max_length=MAX_RESUMES)
+    job_id: int | None = None
+
+
+class JobIn(BaseModel):
+    title: str | None = Field(None, max_length=120)
+    department: str | None = Field(None, max_length=80)
+    location: str | None = Field(None, max_length=80)
+    employment_type: str | None = None
+    status: str | None = None
+    hiring_manager: str | None = Field(None, max_length=80)
+    openings: int | None = Field(None, ge=1, le=999)
+    description: str | None = Field(None, max_length=30_000)
+
+
+class PreviewIn(BaseModel):
+    description: str = Field("", max_length=30_000)
+
+
+def with_summary(job: dict) -> dict:
+    s = engine.job_summary(jdmod.parse(job["description"]))
+    job["summary"] = {"must": s["must_units"], "nice": s["nice_units"], "min_years": s["min_years"],
+                      "education": s["education"], "seniority": s["seniority"]}
+    return job
 
 
 @app.get("/api/health")
@@ -94,7 +147,11 @@ def analyze(body: AnalyzeIn):
 
 @app.post("/api/screen")
 def screen(body: ScreenIn):
-    return engine.screen(body.job, [(r.name, r.text) for r in body.resumes])
+    out = engine.screen(body.job, [(r.name, r.text) for r in body.resumes])
+    if body.job_id is not None and store.get(body.job_id):
+        store.record_screening(body.job_id, len(out["candidates"]), out["counts"]["strong"] + out["counts"]["shortlist"])
+        out["job_id"] = body.job_id
+    return out
 
 
 @app.post("/api/screen/export")
@@ -111,6 +168,61 @@ def export(body: ScreenIn):
                     " | ".join(c["strengths"]), " | ".join(c["risks"]), c["verdict"]["next"]])
     return PlainTextResponse(buf.getvalue(), media_type="text/csv",
                              headers={"Content-Disposition": "attachment; filename=shortlist.csv"})
+
+
+# ------------------------------------------------------------------ job library
+def _or_404(job):
+    if not job:
+        raise HTTPException(404, "Job not found")
+    return job
+
+
+@app.get("/api/jobs")
+def jobs_list():
+    return {"jobs": [with_summary(j) for j in store.list_jobs()],
+            "statuses": store.STATUSES, "employment_types": store.EMPLOYMENT}
+
+
+@app.post("/api/jobs/preview")
+def jobs_preview(body: PreviewIn):
+    if len(body.description.strip()) < 20:
+        return {"must": [], "nice": [], "min_years": None, "education": None, "seniority": None, "title": None}
+    s = engine.job_summary(jdmod.parse(body.description))
+    return {"must": s["must_units"], "nice": s["nice_units"], "min_years": s["min_years"],
+            "education": s["education"], "seniority": s["seniority"], "title": s["title"]}
+
+
+@app.post("/api/jobs", status_code=201)
+def jobs_create(body: JobIn):
+    try:
+        return with_summary(store.create(body.model_dump(exclude_none=True)))
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+
+
+@app.get("/api/jobs/{job_id}")
+def jobs_get(job_id: int):
+    return with_summary(_or_404(store.get(job_id)))
+
+
+@app.put("/api/jobs/{job_id}")
+def jobs_update(job_id: int, body: JobIn):
+    try:
+        return with_summary(_or_404(store.update(job_id, body.model_dump(exclude_none=True))))
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+
+
+@app.delete("/api/jobs/{job_id}")
+def jobs_delete(job_id: int):
+    if not store.delete(job_id):
+        raise HTTPException(404, "Job not found")
+    return {"deleted": job_id}
+
+
+@app.post("/api/jobs/{job_id}/duplicate", status_code=201)
+def jobs_duplicate(job_id: int):
+    return with_summary(_or_404(store.duplicate(job_id)))
 
 
 # ------------------------------------------------------------------ web app
