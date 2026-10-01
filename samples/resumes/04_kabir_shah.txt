@@ -1,0 +1,17 @@
+Kabir Shah
+kabir.shah@example.com
+
+Objective
+Seeking a data science role.
+
+Experience
+MIS Executive — Adatum Logistics | Mar 2023 – Present
+- Responsible for preparing daily MIS reports in Excel
+- Worked on dashboards for the operations team
+- Helped the HR team with attendance data
+
+Skills
+Excel, VBA, Power BI, Python, Machine Learning, SQL, Statistics, Tableau
+
+Education
+B.Com, 2022

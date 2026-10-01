@@ -1,0 +1,23 @@
+Rohan Deshmukh
+rohan.d@example.com | +91 99887 66554
+
+Profile
+Data analyst moving into data science, with 3 years of experience in analytics and reporting.
+
+Experience
+Data Analyst — Fabrikam Retail | Aug 2022 – Present
+- Built Power BI dashboards for 25 store managers, replacing 30 Excel reports
+- Wrote SQL queries on a 40 million row sales database to find margin leaks worth ₹1.2 crore
+- Developed a customer churn classification model in Python with Scikit-learn (AUC 0.81)
+Junior Analyst — Fabrikam Retail | Jan 2022 – Jul 2022
+- Cleaned and joined vendor data in Pandas for monthly MIS reporting
+
+Projects
+- Sales forecasting with time series (ARIMA), 11% MAPE
+- Resume screening tool using NLP and cosine similarity in Streamlit
+
+Skills
+Python, Pandas, NumPy, SQL, Scikit-learn, Power BI, Excel, Statistics, Git
+
+Education
+B.E. Computer Engineering, 2021

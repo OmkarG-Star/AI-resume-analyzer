@@ -1,0 +1,19 @@
+Arjun Nair
+arjun.nair@example.com | +91 98765 43210
+
+Summary
+Data engineer with 3 years of experience building pipelines on AWS.
+
+Experience
+Data Engineer — Woodgrove Bank | May 2022 – Present
+- Built Airflow pipelines loading 200 GB a day into Snowflake with dbt models and tests
+- Migrated legacy SSIS jobs to Spark on Databricks, cutting runtime by 60%
+- Set up CI/CD with GitHub Actions and Terraform for data infrastructure
+Associate Engineer — Woodgrove Bank | Aug 2021 – Apr 2022
+- Wrote Python and SQL ETL jobs for regulatory reporting
+
+Skills
+Python, SQL, Airflow, dbt, Snowflake, Spark, Databricks, Kafka, AWS, Docker, Terraform, Git
+
+Education
+B.Tech Computer Science, 2021

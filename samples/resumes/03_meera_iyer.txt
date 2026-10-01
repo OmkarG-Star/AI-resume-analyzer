@@ -1,0 +1,21 @@
+Meera Iyer
+meera.iyer@example.com | +91 90000 12345
+
+Summary
+Machine learning engineer with 2 years of experience in deep learning and NLP, moving towards applied data science.
+
+Experience
+ML Engineer — Litware AI | Jul 2024 – Present
+- Fine-tuned transformer models in PyTorch for document classification, improving F1 from 0.78 to 0.88
+- Built a retrieval augmented generation (RAG) prototype with LangChain for an internal helpdesk used by 120 staff
+Intern — Litware AI | Jan 2024 – Jun 2024
+- Responsible for data labelling and model evaluation scripts
+
+Projects
+- Employee churn classification in Python with Pandas and Scikit-learn, with feature engineering on 9,000 records
+
+Skills
+Python, Pandas, Scikit-learn, PyTorch, TensorFlow, NLP, LLMs, Docker, Git, SQL, Machine Learning
+
+Education
+B.Tech Information Technology, 2024

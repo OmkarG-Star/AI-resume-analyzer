@@ -1,0 +1,8 @@
+# One-click deploy on Render (free plan): New > Blueprint > select this repo.
+services:
+  - type: web
+    name: resume-intelligence
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/health
+    autoDeploy: true

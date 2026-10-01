@@ -1,0 +1,21 @@
+Ananya Kulkarni
+Pune, India | ananya.k@example.com | +91 98200 11223 | linkedin.com/in/ananya-demo
+
+Summary
+Data Scientist with 5 years of experience building machine learning models for HR and workforce planning.
+
+Experience
+Senior Data Scientist — Northwind Workforce Solutions | Jun 2022 – Present
+- Built an attrition risk model in Python (Scikit-learn, XGBoost) that flagged 72% of leavers in the top decile, used by 40 HR partners
+- Developed SHAP explanations and a Power BI dashboard that cut monthly review prep from 2 days to 3 hours
+- Deployed the model behind a FastAPI service in Docker and set up drift monitoring
+- Designed A/B tests for onboarding nudges, improving 90-day retention by 6%
+Data Analyst — Contoso Analytics | Jul 2020 – May 2022
+- Automated SQL and Pandas pipelines for 12 weekly HR reports, saving 15 hours a week
+- Forecasted hiring demand with time series models (Prophet) with 8% error
+
+Skills
+Python, SQL, Pandas, NumPy, Scikit-learn, XGBoost, SHAP, Statistics, Power BI, Tableau, FastAPI, Docker, Git, AWS
+
+Education
+M.Sc. Statistics, Savitribai Phule Pune University, 2020

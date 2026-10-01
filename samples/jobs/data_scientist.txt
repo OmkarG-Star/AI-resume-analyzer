@@ -1,0 +1,24 @@
+Data Scientist (Mid-level) — People Analytics
+
+About the role
+We are building our people analytics function and need a Data Scientist who can turn HR and workforce data into models that managers actually use.
+
+What you will do
+- Build and deploy machine learning models for attrition risk, hiring funnel forecasting and workforce planning
+- Own data preparation in Python and SQL, from raw HRMS extracts to clean feature tables
+- Explain model outputs to HR business partners with clear dashboards and written insights
+- Work with engineering to put models behind APIs and monitor them in production
+
+Requirements
+- 3+ years of experience in data science or analytics
+- Strong Python (Pandas, NumPy, Scikit-learn) and SQL
+- Hands-on machine learning: classification, regression, feature engineering and model evaluation
+- Experience building dashboards in Power BI or Tableau
+- Statistics and A/B testing fundamentals
+- Bachelor's degree in a quantitative field
+
+Nice to have
+- Explainable AI (SHAP) and time series forecasting
+- FastAPI or Flask, Docker and Git
+- Experience with HR analytics or people analytics
+- Exposure to AWS or Azure

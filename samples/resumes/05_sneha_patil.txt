@@ -1,0 +1,21 @@
+Sneha Patil
+sneha.patil@example.com | +91 91234 56789 | github.com/sneha-demo
+
+Summary
+People analytics specialist with 4 years of experience in HR analytics and machine learning.
+
+Experience
+People Analytics Lead — Tailspin Toys | Apr 2022 – Present
+- Developed attrition and absenteeism models in Python (Pandas, Scikit-learn) covering 6,000 employees
+- Built Tableau and Power BI dashboards for 18 business partners on hiring, attrition and diversity
+- Analysed engagement survey data with statistics and hypothesis testing; findings shaped a ₹40 lakh retention budget
+- Partnered with stakeholders to define HR metrics and data quality rules
+HR Data Analyst — Tailspin Toys | Jun 2021 – Mar 2022
+- Automated SQL extracts from the HRMS, reducing report turnaround from 5 days to 1 day
+
+Skills
+Python, SQL, Pandas, NumPy, Scikit-learn, Tableau, Power BI, Statistics, Feature Engineering, Model Evaluation, HR Analytics, Communication
+
+Education
+MBA (HR & Analytics), 2021
+B.Sc. Mathematics, 2019
