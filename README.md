@@ -2,7 +2,7 @@
 
 **Explainable resume screening for recruiters, and honest resume coaching for candidates.**
 
-[![CI](https://github.com/OmkarG-Star/ai-resume-analyzer/actions/workflows/ci.yml/badge.svg)](https://github.com/OmkarG-Star/ai-resume-analyzer/actions/workflows/ci.yml)
+[![CI](https://github.com/OmkarG-Star/AI-resume-analyzer/actions/workflows/ci.yml/badge.svg)](https://github.com/OmkarG-Star/AI-resume-analyzer/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/Python-3.11-3776AB)
 ![FastAPI](https://img.shields.io/badge/FastAPI-API-009688)
 ![License](https://img.shields.io/badge/License-MIT-green)
@@ -106,7 +106,7 @@ legacy/              the original Streamlit + TF-IDF version, kept for compariso
 ## Run it
 
 ```bash
-git clone https://github.com/OmkarG-Star/ai-resume-analyzer.git
+git clone https://github.com/OmkarG-Star/AI-resume-analyzer.git
 cd ai-resume-analyzer
 pip install -r requirements.txt
 PYTHONPATH=src uvicorn resume_ai.api:app --reload
