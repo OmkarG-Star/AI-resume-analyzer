@@ -1,0 +1,20 @@
+Tarun Bose
+tarun.bose@example.com | +91 97400 21010
+
+Summary
+Platform engineer running machine learning infrastructure.
+
+Experience
+ML Platform Engineer — Relecloud | Jan 2022 – Present
+- Ran Kubernetes clusters that serve 40 models for the data science team
+- Built CI/CD pipelines with GitHub Actions and Docker for model releases
+- Set up MLflow tracking and a model registry used by 25 data scientists
+- Wrote Python services that monitor latency and drift for deployed models
+DevOps Engineer — Relecloud | Jun 2020 – Dec 2021
+- Automated AWS infrastructure with Terraform
+
+Skills
+Python, Kubernetes, Docker, MLflow, CI/CD, Git, AWS, Terraform, Linux
+
+Education
+B.E. Electronics, 2020

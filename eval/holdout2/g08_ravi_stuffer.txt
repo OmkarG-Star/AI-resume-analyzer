@@ -1,0 +1,18 @@
+Ravi Sharma
+ravi.sharma@example.com | +91 98000 21008
+
+Summary
+HR data analyst.
+
+Experience
+Analyst — Freelance | Feb 2025 – Present
+- Own monthly headcount, attrition and hiring dashboards
+- Answer ad-hoc questions from HR business partners with SQL and Excel
+- Improve data quality in the HRMS and document metric definitions
+- Strong SQL and Excel, dashboards in Power BI or Tableau, data cleaning and data visualization
+
+Skills
+SQL, Excel, Power BI, Tableau, Data Cleaning, Data Visualization, HR Analytics, Python, Pandas, Statistics, Communication
+
+Education
+B.A., 2024

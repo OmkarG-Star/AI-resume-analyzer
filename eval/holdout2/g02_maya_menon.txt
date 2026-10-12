@@ -1,0 +1,18 @@
+Maya Menon
+maya.menon@example.com | +91 98450 21002
+
+Summary
+Backend engineer interested in data platforms.
+
+Experience
+Software Engineer — Fabrikam Bank | Jun 2021 – Present
+- Built Java microservices for loan processing used by 300 branches
+- Wrote Python scripts that export daily transactions from PostgreSQL to S3
+- Set up one Airflow job to schedule the nightly export
+- Added CI/CD with GitHub Actions and code reviews in Git
+
+Skills
+Java, Python, PostgreSQL, SQL, Airflow, AWS, Git, CI/CD, Docker
+
+Education
+B.Tech Computer Science, 2021

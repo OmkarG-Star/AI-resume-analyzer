@@ -1,0 +1,19 @@
+Kiran Patil
+kiran.patil@example.com | +91 98220 21001
+
+Summary
+Data analyst with three years in e-commerce reporting.
+
+Experience
+Data Analyst — ShopKart | Jul 2023 – Present
+- Built 18 Tableau dashboards on orders, returns and delivery times for 40 category managers
+- Wrote SQL queries on a 60 million row orders table to find a ₹80 lakh returns leak
+- Cleaned and deduplicated supplier master data, fixing 2,500 records
+Junior Analyst — ShopKart | Jul 2022 – Jun 2023
+- Prepared weekly sales reports in Excel for 6 regions
+
+Skills
+SQL, Excel, Tableau, Data Cleaning, Data Visualization, Python
+
+Education
+B.Com, 2022

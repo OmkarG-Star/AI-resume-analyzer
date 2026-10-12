@@ -1,0 +1,20 @@
+Arjun Kale
+arjun.kale@example.com | +91 90110 21007
+
+Summary
+Recent graduate aiming for data engineering.
+
+Projects
+- Built an Airflow pipeline that loads public transport data into Snowflake, with dbt models and tests
+- Streamed sensor data through Kafka into Postgres for a college project
+- Containerised the project with Docker and set up GitHub Actions
+
+Experience
+Data Engineering Intern — Wingtip | Jan 2026 – Jun 2026
+- Wrote SQL checks for 10 nightly loads
+
+Skills
+Python, SQL, Airflow, dbt, Snowflake, Kafka, Docker, Git
+
+Education
+B.Tech Information Technology, 2026

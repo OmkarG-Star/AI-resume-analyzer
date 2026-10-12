@@ -1,0 +1,20 @@
+resume,job,label,note
+eval/holdout2/g01_kiran_patil.txt,hr,shortlist,SQL Tableau Excel and data cleaning; HR analytics is only a nice-to-have
+eval/holdout2/g01_kiran_patil.txt,ds,reject,no machine learning
+eval/holdout2/g02_maya_menon.txt,de,maybe,adjacent: backend engineer with some pipeline work
+eval/holdout2/g02_maya_menon.txt,ml,reject,no machine learning
+eval/holdout2/g03_suresh_kumar.txt,de,shortlist,real DE work described without naming most tools
+eval/holdout2/g03_suresh_kumar.txt,ae,maybe,SQL models with tests and star schema but tools not named
+eval/holdout2/g04_neha_srinivasan.txt,ml,maybe,strong deep learning but no deployment or MLOps
+eval/holdout2/g04_neha_srinivasan.txt,ds,maybe,adjacent: strong ML but no HR dashboards or SQL
+eval/holdout2/g05_vivek_jain.txt,hr,maybe,HR dashboards but no SQL
+eval/holdout2/g06_priyanka_desai.txt,ds,shortlist,meets the core ML requirements outside HR
+eval/holdout2/g07_arjun_kale.txt,de,reject,fresh graduate against 2+ years
+eval/holdout2/g08_ravi_stuffer.txt,hr,reject,stuffer: job requirements pasted as bullets
+eval/holdout2/g09_lakshmi_rao.txt,ae,shortlist,analytics engineering work described in plain words with BigQuery and Looker
+eval/holdout2/g09_lakshmi_rao.txt,de,maybe,warehouse modelling but no orchestration or streaming
+eval/holdout2/g10_tarun_bose.txt,ml,maybe,adjacent: MLOps platform without model building
+eval/holdout2/g11_divya_nair.txt,ds,shortlist,exact fit
+eval/holdout2/g11_divya_nair.txt,hr,shortlist,overqualified but meets every requirement
+eval/holdout2/g12_harish_mehta.txt,hr,reject,accountant without SQL or dashboards
+eval/holdout2/g12_harish_mehta.txt,ae,reject,no analytics engineering

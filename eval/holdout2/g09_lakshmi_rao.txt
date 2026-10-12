@@ -1,0 +1,20 @@
+Lakshmi Rao
+lakshmi.rao@example.com | +91 98440 21009
+
+Summary
+Analytics engineer.
+
+Experience
+Analytics Engineer — Tailspin Media | Sep 2022 – Present
+- Built modular SQL models with tests and documentation in BigQuery for subscriptions and ads revenue
+- Designed star-schema marts used by 8 teams and 150 dashboard users
+- Defined 30 shared metrics in Looker so every report uses the same numbers
+- Reviewed teammates' changes through pull requests in Git
+BI Analyst — Tailspin Media | Jul 2021 – Aug 2022
+- Built Looker reports and SQL views for monthly business reviews
+
+Skills
+SQL, BigQuery, Looker, Data Modeling, Git
+
+Education
+B.Sc. Statistics, 2021

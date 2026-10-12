@@ -1,0 +1,21 @@
+Suresh Kumar
+suresh.kumar@example.com | +91 99000 21003
+
+Summary
+Data engineer, four years.
+
+Experience
+Data Engineer — Contoso Insurance | Aug 2022 – Present
+- Scheduled nightly loads from 20 source systems with a DAG orchestrator, with retries and alerting
+- Wrote SQL transformation models with tests and documentation in our Snowflake warehouse
+- Designed fact and dimension tables for claims and policies used by 45 analysts
+- Added null and duplicate checks that stopped 90% of bad loads reaching reports
+- Kept all pipeline code in version control with pull request reviews and automated deployments
+Associate Data Engineer — Contoso Insurance | Jul 2021 – Jul 2022
+- Wrote Python and SQL extract jobs for monthly regulatory files
+
+Skills
+Python, SQL, Snowflake
+
+Education
+B.E. Computer Engineering, 2021

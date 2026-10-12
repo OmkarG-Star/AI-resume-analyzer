@@ -1,0 +1,17 @@
+Vivek Jain
+vivek.jain@example.com | +91 97660 21005
+
+Summary
+HR analyst focused on workforce reporting.
+
+Experience
+HR Analyst — Alpine Ski House | May 2024 – Present
+- Built Power BI dashboards on headcount and attrition for 12 HR business partners
+- Maintained joiner and leaver trackers in Excel for 1,500 employees
+- Presented monthly people metrics to the leadership team
+
+Skills
+Excel, Power BI, HR Analytics, Communication
+
+Education
+MBA (HR), 2024

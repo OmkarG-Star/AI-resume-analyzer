@@ -1,0 +1,20 @@
+Divya Nair
+divya.nair@example.com | +91 98190 21011
+
+Summary
+People analytics data scientist.
+
+Experience
+Senior Data Scientist, People Analytics — Northwind Group | Apr 2021 – Present
+- Built attrition classification and salary regression models in Python with Scikit-learn, Pandas and NumPy for 18,000 employees
+- Engineered 45 features from HRMS, payroll and engagement data; evaluated models with cross-validation and AUC
+- Built Power BI dashboards on attrition risk for 35 HR business partners
+- Ran A/B tests on onboarding changes and reported significance to leadership
+People Analyst — Northwind Group | Jul 2019 – Mar 2021
+- Wrote SQL on the HR data warehouse and Excel models for workforce planning
+
+Skills
+Python, SQL, Pandas, NumPy, Scikit-learn, Statistics, Power BI, Excel, HR Analytics, Machine Learning
+
+Education
+M.Sc. Economics, 2019

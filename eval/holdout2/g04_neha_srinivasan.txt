@@ -1,0 +1,19 @@
+Neha Srinivasan
+neha.s@example.com | +91 98860 21004
+
+Summary
+NLP researcher with four years of deep learning research.
+
+Experience
+Research Scientist — Litware Labs | Jan 2023 – Present
+- Trained transformer models in PyTorch for legal document classification, improving F1 by 9 points
+- Published 3 papers on low-resource text classification
+- Built evaluation suites with precision, recall and calibration for 6 models
+PhD Researcher — IISc Bengaluru | Aug 2019 – Dec 2022
+- Developed neural models for Indian-language NLP in Python and PyTorch
+
+Skills
+Python, PyTorch, NLP, Deep Learning, Machine Learning, Statistics, NumPy, Pandas
+
+Education
+PhD Computer Science, 2022

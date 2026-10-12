@@ -1,0 +1,20 @@
+Priyanka Desai
+priyanka.desai@example.com | +91 99300 21006
+
+Summary
+Data scientist in healthcare analytics.
+
+Experience
+Data Scientist — Coho Health | Mar 2022 – Present
+- Built readmission classification and length-of-stay regression models in Python with Scikit-learn, Pandas and NumPy
+- Engineered 70 features from claims and clinical data; evaluated models with cross-validation and AUC
+- Ran statistical tests on 8 care programmes; findings changed two discharge processes
+- Built Power BI dashboards for 25 hospital managers
+Analyst — Coho Health | Jun 2020 – Feb 2022
+- Wrote SQL on the claims warehouse for monthly reporting
+
+Skills
+Python, SQL, Pandas, NumPy, Scikit-learn, Statistics, Power BI, Machine Learning
+
+Education
+M.Sc. Statistics, 2020
