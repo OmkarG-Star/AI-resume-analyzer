@@ -30,7 +30,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import FileResponse, PlainTextResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -70,6 +70,15 @@ async def lifespan(_app):
 app = FastAPI(title="Resume Intelligence", version=__version__, lifespan=lifespan,
               docs_url="/api/docs", openapi_url="/api/openapi.json")
 app.add_middleware(GZipMiddleware, minimum_size=800)
+
+
+@app.middleware("http")
+async def revalidate_assets(request, call_next):
+    """Browsers re-check static files on each visit (a cheap 304 when unchanged)."""
+    response = await call_next(request)
+    if request.url.path.startswith("/assets/"):
+        response.headers["Cache-Control"] = "no-cache"
+    return response
 
 
 class ResumeIn(BaseModel):
@@ -256,13 +265,19 @@ if (FRONTEND / "assets").is_dir():
     app.mount("/assets", StaticFiles(directory=FRONTEND / "assets"), name="assets")
 
 
+def _page() -> HTMLResponse:
+    # Asset URLs carry the version so a deploy never mixes a new page with old cached CSS or JS.
+    html = (FRONTEND / "index.html").read_text(encoding="utf-8").replace("__VERSION__", __version__)
+    return HTMLResponse(html, headers={"Cache-Control": "no-cache"})
+
+
 @app.get("/")
 def index():
-    return FileResponse(FRONTEND / "index.html")
+    return _page()
 
 
 @app.get("/{path:path}")
 def spa(path: str):
     if path.startswith("api/"):
         raise HTTPException(404, "Unknown API route")
-    return FileResponse(FRONTEND / "index.html")
+    return _page()

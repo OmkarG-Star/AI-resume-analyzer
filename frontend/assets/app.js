@@ -139,6 +139,8 @@ const App = (() => {
 
   function render(anim = true) {
     const r = ROUTES[route()] ? route() : 'overview';
+    // A new page starts at the top; re-renders of the same page keep their place.
+    if (S.lastRoute !== r) { S.lastRoute = r; window.scrollTo(0, 0); }
     document.querySelectorAll('.nav a[data-r]').forEach(a => a.classList.toggle('on', a.dataset.r === r));
     $('crumbs').innerHTML = `<span class="crumb-sec">${esc(ROUTES[r].crumb)} ${I('chevronRight', 14)}</span> <b>${esc(ROUTES[r].title)}</b>`;
     $('top-actions').innerHTML = topActions(r);
@@ -1075,6 +1077,7 @@ const App = (() => {
       S.activity.unshift({ title: (S.job.id && jobById(S.job.id)?.title) || S.screen.job.title || title, n: S.screen.candidates.length, counts: S.screen.counts,
         flags: S.screen.candidates.filter(c => c.integrity?.suspicious).length, at: new Date().toISOString() });
       S.activity = S.activity.slice(0, 6);
+      window.scrollTo(0, 0);
       if (route() !== 'screen') location.hash = '#/screen'; else render();
       setTimeout(() => { S.dealt = false; }, 1600);
       toast(`Screened ${S.screen.candidates.length} candidates`);
@@ -1086,7 +1089,7 @@ const App = (() => {
     if (btn) { btn.disabled = true; btn.classList.add('busy'); btn.innerHTML = `${I('refresh', 16)} Analysing…`; }
     try {
       const r = await api('/api/analyze', { resume: S.imp.resume.text, job: S.imp.job, assume_skills: [...S.imp.assume] });
-      if (!keepBase) S.imp.base = r.score;
+      if (!keepBase) { S.imp.base = r.score; window.scrollTo(0, 0); }
       S.imp.result = r;
       render(!keepBase);
     } catch (e) { toast(e.message, true); render(false); }
@@ -1161,7 +1164,7 @@ const App = (() => {
         if (a === 'upload-imp') { pendingTarget = 'imp'; return $('file-one').click(); }
         if (a === 'rm-resume') { S.resumes.splice(+t.dataset.i, 1); return render(false); }
         if (a === 'run-screen') return runScreen();
-        if (a === 'edit-inputs') { S.screen = null; S.drawer = null; S.compare.clear(); return render(); }
+        if (a === 'edit-inputs') { S.screen = null; S.drawer = null; S.compare.clear(); window.scrollTo(0, 0); return render(); }
         if (a === 'export') {
           const csv = await api('/api/screen/export', { job: S.job.text, resumes: S.resumes.map(r => ({ name: r.name, text: r.text })) });
           const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
@@ -1191,7 +1194,7 @@ const App = (() => {
         if (a === 'demo-improve') { const s = await samples(); S.imp.resume = { name: s.resumes[3].name, text: s.resumes[3].text }; S.imp.job = s.jobs[1].text; S.imp.jobId = null; S.imp.assume.clear(); render(false); return runImprove(); }
         if (a === 'imp-sample-job') { const s = await samples(); S.imp.job = s.jobs[+t.dataset.i].text; return render(false); }
         if (a === 'run-improve') { S.imp.assume.clear(); return runImprove(); }
-        if (a === 'imp-reset') { S.imp.result = null; S.imp.base = null; S.imp.assume.clear(); return render(); }
+        if (a === 'imp-reset') { S.imp.result = null; S.imp.base = null; S.imp.assume.clear(); window.scrollTo(0, 0); return render(); }
         if (a === 'assume') { const s = t.dataset.s; S.imp.assume.has(s) ? S.imp.assume.delete(s) : S.imp.assume.add(s); return runImprove(true); }
         return;
       }
@@ -1202,7 +1205,7 @@ const App = (() => {
       document.body.appendChild(b); b.click(); b.remove(); });
 
     document.addEventListener('keydown', ev => {
-      const typing = ev.target.matches('input, textarea, select, [contenteditable]');
+      const typing = !!ev.target.matches?.('input, textarea, select, [contenteditable]');
       if ((ev.metaKey || ev.ctrlKey) && ev.key.toLowerCase() === 'k') { ev.preventDefault(); if (S.palette) { S.palette = null; return renderOverlays(); } return openPalette(); }
       if (S.palette) {
         const n = paletteResults().length;
@@ -1221,8 +1224,8 @@ const App = (() => {
       }
       if (ev.key === 'Escape' && (S.confirm || S.editor)) { if (S.confirm) S.confirm = null; else S.editor = null; return renderOverlays(); }
       if (ev.key === 'Escape') { if (S.compareOpen) S.compareOpen = false; else if (S.drawer) S.drawer = null; else return; renderOverlays(); }
-      if (ev.key === 'Enter' && ev.target.matches('[data-cand]')) { S.drawer = ev.target.dataset.cand; S.tab = 'overview'; renderOverlays(); }
-      if ((ev.key === 'Enter' || ev.key === ' ') && ev.target.matches('.drop')) { ev.preventDefault(); pendingTarget = 'multi'; $('file-multi').click(); }
+      if (ev.key === 'Enter' && ev.target.matches?.('[data-cand]')) { S.drawer = ev.target.dataset.cand; S.tab = 'overview'; renderOverlays(); }
+      if ((ev.key === 'Enter' || ev.key === ' ') && ev.target.matches?.('.drop')) { ev.preventDefault(); pendingTarget = 'multi'; $('file-multi').click(); }
     });
 
     document.addEventListener('input', ev => {

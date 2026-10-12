@@ -59,3 +59,11 @@ def test_model_card_reports_weights_and_agreement():
     assert ev["n"] >= 50 and 0 < ev["kappa"] <= 1
     assert sum(map(sum, ev["confusion"])) == ev["n"]
     assert r["history"][-1]["version"] == r["version"].rsplit(".", 1)[0]
+
+
+def test_page_busts_cache_for_assets():
+    r = client.get("/")
+    assert r.headers["cache-control"] == "no-cache"
+    assert "__VERSION__" not in r.text and "/assets/app.js?v=" in r.text
+    assert client.get("/screen").text == r.text
+    assert client.get("/assets/app.js").headers["cache-control"] == "no-cache"
