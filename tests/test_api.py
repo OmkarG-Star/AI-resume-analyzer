@@ -67,3 +67,18 @@ def test_page_busts_cache_for_assets():
     assert "__VERSION__" not in r.text and "/assets/app.js?v=" in r.text
     assert client.get("/screen").text == r.text
     assert client.get("/assets/app.js").headers["cache-control"] == "no-cache"
+
+
+def test_api_docs_are_not_public():
+    assert client.get("/api/docs").status_code == 404
+    assert client.get("/api/openapi.json").status_code == 404
+
+
+def test_analysis_explains_points_and_highlights():
+    s = client.get("/api/samples").json()
+    r = client.post("/api/analyze", json={"resume": s["resumes"][0]["text"], "job": s["jobs"][1]["text"]}).json()
+    active = [p for p in r["parts"] if p["value"] is not None]
+    assert abs(sum(p["points"] for p in active) - r["raw_score"]) < 0.6
+    ev = r["evidence"]
+    assert ev["highlights"] and all(0 <= h["start"] < h["end"] <= len(ev["text"]) for h in ev["highlights"])
+    assert {"miss_ratio", "experience", "suspicious", "penalty"} <= set(r["verdict_inputs"])

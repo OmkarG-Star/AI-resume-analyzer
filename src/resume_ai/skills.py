@@ -179,6 +179,72 @@ RELATED: dict[str, list[str]] = {
 }
 RELATED_CREDIT = 0.4
 
+# One-line descriptions of what each skill looks like in practice. The semantic
+# model compares these with resume lines to spot skills described without
+# their name. Skills without an entry use "<name> (<category>)".
+SKILL_DESC: dict[str, str] = {
+    "Python": "writing Python code and scripts for data processing or automation",
+    "SQL": "writing SQL queries, joins and aggregations on relational databases",
+    "Excel": "building spreadsheets, pivot tables and formulas in Excel",
+    "Power BI": "building Power BI reports and dashboards with DAX",
+    "Tableau": "building Tableau dashboards and visual analytics",
+    "Data Visualization": "building dashboards, charts and visual reports for stakeholders",
+    "Data Analysis": "analysing data to find trends and answer business questions",
+    "Data Cleaning": "cleaning, deduplicating and fixing messy records and master data",
+    "Statistics": "statistical analysis, hypothesis tests, significance and confidence intervals",
+    "EDA": "exploring a dataset to understand distributions and patterns",
+    "Pandas": "manipulating tabular data with pandas dataframes in Python",
+    "NumPy": "numerical computing with arrays in Python",
+    "MIS Reporting": "preparing recurring management information reports",
+    "Machine Learning": "training and evaluating predictive machine learning models",
+    "Deep Learning": "training neural networks for prediction or perception tasks",
+    "Scikit-learn": "building machine learning models with scikit-learn",
+    "PyTorch": "training neural networks with PyTorch",
+    "TensorFlow": "training neural networks with TensorFlow or Keras",
+    "NLP": "processing and classifying text with natural language processing",
+    "LLMs": "building applications with large language models, prompts and retrieval",
+    "Feature Engineering": "deriving and selecting input features for a predictive model",
+    "Model Evaluation": "evaluating models with holdout sets, precision, recall and AUC",
+    "Time Series": "forecasting values over time such as demand or headcount",
+    "Explainable AI": "explaining model predictions with SHAP or feature importance",
+    "Classification": "classification models that predict which category something belongs to, such as whether an employee will leave",
+    "Regression": "regression models that predict a numeric value such as salary, price or demand",
+    "Clustering": "grouping similar records into segments without labels",
+    "MLOps": "deploying, tracking and monitoring machine learning models in production",
+    "ETL": "building data pipelines that extract, transform and load data on a schedule",
+    "Apache Spark": "processing large datasets with distributed compute such as Spark",
+    "Kafka": "streaming events through a message broker in real time",
+    "Airflow": "scheduling and orchestrating data pipeline workflows as DAGs with retries",
+    "dbt": "SQL transformation models with tests and documentation in a data warehouse",
+    "Data Warehousing": "designing and loading a data warehouse with fact and dimension tables",
+    "Data Modeling": "designing data models and schemas such as star schemas",
+    "Data Quality": "data validation checks for nulls, duplicates and broken records",
+    "Snowflake": "working in the Snowflake cloud data warehouse",
+    "BigQuery": "working in the Google BigQuery cloud data warehouse",
+    "Redshift": "working in the Amazon Redshift cloud data warehouse",
+    "Databricks": "working with notebooks and Spark on Databricks",
+    "AWS": "using Amazon Web Services cloud such as S3, EC2 or Lambda",
+    "Azure": "using Microsoft Azure cloud services",
+    "GCP": "using Google Cloud Platform services",
+    "Docker": "packaging applications in Docker containers",
+    "Kubernetes": "running containers on Kubernetes clusters",
+    "CI/CD": "automated build, test and deployment pipelines",
+    "Git": "version control with Git, branches, pull requests and code review",
+    "FastAPI": "building REST APIs with FastAPI",
+    "Flask": "building web services with Flask",
+    "REST APIs": "designing and building REST API endpoints",
+    "HR Analytics": "analysing workforce data such as headcount, attrition, hiring and absenteeism",
+    "Stakeholder Management": "working with business stakeholders to agree requirements",
+    "Communication": "presenting findings clearly to managers and non-technical people",
+    "Leadership": "leading or mentoring a team",
+    "Project Management": "planning and delivering projects with agile or scrum",
+    "Looker": "building Looker or Looker Studio dashboards and metrics",
+}
+
+
+def skill_query(skill: str) -> str:
+    return SKILL_DESC.get(skill) or f"{skill} ({CATEGORY.get(skill, 'skill')})"
+
 CATEGORY: dict[str, str] = {s: cat for cat, skills in TAXONOMY.items() for s in skills}
 ALL_SKILLS: list[str] = list(CATEGORY)
 

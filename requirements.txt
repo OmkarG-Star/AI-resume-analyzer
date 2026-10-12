@@ -6,3 +6,6 @@ scikit-learn>=1.4
 numpy>=1.26
 pypdf>=4.0
 python-docx>=1.1
+# Meaning-based matching: a small ONNX sentence-embedding model, no PyTorch.
+onnxruntime>=1.17
+tokenizers>=0.15

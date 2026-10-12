@@ -18,6 +18,8 @@ const App = (() => {
     jobs: null, jobMeta: { statuses: ['Open', 'On hold', 'Closed'], employment_types: ['Full-time', 'Part-time', 'Contract', 'Internship'] },
     jobFilter: store.get('ri2-jobfilter') || 'All', jobQ: '', editor: null, confirm: null,
     activity: [], model: null, palette: null, shortcuts: false, run: null, dealt: false,
+    weights: null, pipe: {}, groups: {}, fair: { attr: 'experience', outcome: 'shortlist' },
+    hl: new Set(['shown', 'listed', 'related', 'metric']), detail: null, tune: false,
   };
   const isMac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
   const MOD = isMac ? '⌘' : 'Ctrl';
@@ -36,6 +38,7 @@ const App = (() => {
     experience: 'Years from dated roles (overlaps merged) against the minimum the job asks for.',
     education: 'Highest qualification found against the level the job asks for.',
     similarity: 'How closely the overall wording matches the job (TF-IDF cosine similarity), scaled 0–100.',
+    semantic: 'How closely the meaning of the resume’s work lines matches the job’s lines, from a small sentence-embedding model (MiniLM). Catches work described in different words.',
     evidence: 'Bullets with measurable results, bullets that start with action verbs, and skills shown in real work rather than only listed.',
     quality: 'Structure checks: contact details, standard sections, sensible length, measurable bullets.',
   };
@@ -54,16 +57,19 @@ const App = (() => {
     return path.endsWith('export') ? r.text() : r.json();
   }
 
-  function toast(msg, err) {
+  function toast(msg, err, action) {
     let host = $('toasts');
     if (!host) { host = Object.assign(document.createElement('div'), { id: 'toasts', className: 'toasts' });
       host.setAttribute('role', 'status'); host.setAttribute('aria-live', 'polite'); document.body.appendChild(host); }
     while (host.children.length >= 3) host.firstChild.remove();
     const t = document.createElement('div');
     t.className = 'toast' + (err ? ' err' : '');
-    t.innerHTML = `${I(err ? 'alert' : 'check')}<span>${esc(msg)}</span><i class="toast-timer"></i>`;
+    t.innerHTML = `${I(err ? 'alert' : 'check')}<span>${esc(msg)}</span>${action ? `<button class="toast-act">${esc(action.label)}</button>` : ''}<i class="toast-timer"></i>`;
+    if (action) t.querySelector('.toast-act').onclick = () => { action.run(); t.remove(); };
     host.appendChild(t);
-    setTimeout(() => { t.classList.add('out'); setTimeout(() => t.remove(), 250); }, 3400);
+    const life = action ? 6000 : 3400;
+    t.querySelector('.toast-timer').style.animationDuration = `${life}ms`;
+    setTimeout(() => { t.classList.add('out'); setTimeout(() => t.remove(), 250); }, life);
   }
 
   const tip = t => `<button type="button" class="tip" data-tip="${esc(t)}" aria-label="${esc(t)}">${I('info', 14)}</button>`;
@@ -220,6 +226,7 @@ const App = (() => {
             <b>Drop resumes here or click to browse</b>
             <span class="small muted">or <a href="#" data-act="sample-resumes">use 6 fictional sample resumes</a></span>
           </div>
+          ${S.resumes.length > 1 ? `<div class="row" style="justify-content:space-between;margin-top:12px"><span class="small muted">${S.resumes.length} resumes ready</span><button class="btn btn-sm btn-ghost" data-act="rm-all-resumes">${I('trash', 14)} Remove all</button></div>` : ''}
           <div class="files">${S.resumes.map((r, i) => `
             <div class="file">${I('fileText')}<span>${esc(r.name)}</span><span class="tiny muted" style="flex:none">${r.words || r.text.split(/\s+/).length} words</span>
               <button class="icon-btn" style="width:28px;height:28px" data-act="rm-resume" data-i="${i}" aria-label="Remove ${esc(r.name)}">${I('x', 14)}</button></div>`).join('')}</div>
@@ -260,14 +267,14 @@ const App = (() => {
 
     <div class="toolbar">
       <div class="seg tabseg" role="tablist" aria-label="Results view">
-        ${[['board', 'board', 'Board', '1'], ['table', 'table', 'Ranked list', '2'], ['insights', 'segments', 'Insights', '3']].map(([v, ic, l, k]) =>
+        ${RTABS.map(([v, ic, l, k]) =>
           `<button role="tab" aria-selected="${S.view === v}" class="${S.view === v ? 'on' : ''}" data-act="view" data-v="${v}" title="${l} (${k})">${I(ic, 15)} ${l}</button>`).join('')}
       </div>
-      <label class="search" ${S.view === 'insights' ? 'hidden' : ''}>${I('search', 15)}<input type="search" id="q" placeholder="Search name, file or skill" value="${esc(S.q)}"></label>
+      <label class="search" ${['insights', 'fairness'].includes(S.view) ? 'hidden' : ''}>${I('search', 15)}<input type="search" id="q" placeholder="Search name, file or skill" value="${esc(S.q)}"></label>
       <label class="switch" title="Hide names to reduce bias"><input type="checkbox" id="blind" ${S.blind ? 'checked' : ''}><i></i>Blind screening</label>
       <span style="flex:1"></span>
-      ${flagged().length ? `<button class="chip flag-chip" data-act="show-flagged">${I('anomaly', 13)}${flagged().length} flagged for integrity</button>` : ''}
-      <span class="small muted hide-sm">${I('compare', 14)} Tick up to 3 to compare</span>
+      ${flagged().length ? `<button class="chip flag-chip" data-act="show-flagged">${I('anomaly', 13)}${flagged().length} flagged</button>` : ''}
+      <button class="btn btn-sm ${S.weights ? 'btn-tuned' : ''}" data-act="tune" aria-pressed="${!!S.tune}">${I('scale', 14)} ${S.weights ? 'Custom weights' : 'Tune weights'}</button>
     </div>
     <div id="results">${resultsView()}</div>`;
   }
@@ -276,7 +283,7 @@ const App = (() => {
     const shown = c.skills.filter(s => s.importance === 'must' && s.status === 'shown').slice(0, 3);
     const miss = c.skills.filter(s => s.importance === 'must' && s.status === 'missing').length;
     return `<article class="ccard ${S.compare.has(c.id) ? 'sel' : ''} ${S.dealt ? 'dealt' : ''}" data-cand="${c.id}" style="--i:${S.dealt ? c.rank : i}" tabindex="0" aria-label="${esc(candName(c))}, score ${Math.round(c.score)}, ${esc(c.verdict.label)}">
-      <div class="ccard-top">${avatar(c)}<div class="who"><b>${esc(candName(c))}</b><span>${esc(c.file)}</span></div>${ring(c.score, 44, 5)}</div>
+      <div class="ccard-top">${avatar(c)}<div class="who"><b>${esc(candName(c))}${deltaChip(c)}</b><span>${esc(c.file)}</span></div><button class="ring-btn" data-act="explain" data-id="${c.id}" data-tip="Explain this score">${ring(c.score, 44, 5)}</button></div>
       ${c.integrity?.suspicious ? `<div class="flag">${I('anomaly', 13)}Possible keyword stuffing</div>` : ''}
       <div class="meta"><span>${I('target', 13)}${c.summary.must_matched}/${S.screen.job.must_units.length} must</span>
         <span>${I('clock', 13)}${c.summary.years != null ? c.summary.years + ' yrs' : 'n/a'}</span>
@@ -284,7 +291,7 @@ const App = (() => {
       <div class="chips">${shown.map(s => `<span class="chip shown">${esc(s.matched || s.skill)}</span>`).join('')}
         ${miss ? `<span class="chip missing">${miss} missing</span>` : ''}</div>
       <div class="row" style="margin-top:10px;justify-content:space-between">
-        <span class="tiny muted">#${c.rank}</span>
+        <span class="tiny muted">#${c.rank}${pipeOf(c).stage !== 'New' ? ` · <span class="stage-chip" style="--c:${STAGE_C[pipeOf(c).stage]}">${esc(pipeOf(c).stage)}</span>` : ''}${pipeOf(c).notes.length ? ` · ${I('note', 11)}${pipeOf(c).notes.length}` : ''}</span>
         <button class="cmp-check ${S.compare.has(c.id) ? 'on' : ''}" data-act="cmp" data-id="${c.id}" aria-label="Compare">${I('check', 13)}</button>
       </div></article>`;
   }
@@ -301,12 +308,13 @@ const App = (() => {
   function table() {
     const list = filtered();
     return `<section class="card" style="overflow:hidden"><div style="overflow-x:auto"><table class="tbl"><thead><tr>
-      <th>#</th><th>Candidate</th><th>Score</th><th>Verdict</th><th class="num">Must-haves</th><th class="num">Years</th><th>Top risk</th><th></th>
+      <th>#</th><th>Candidate</th><th>Score</th><th>Verdict</th><th>Stage</th><th class="num">Must-haves</th><th class="num">Years</th><th>Top risk</th><th></th>
       </tr></thead><tbody>${list.map(c => `<tr data-cand="${c.id}">
-        <td class="muted">${c.rank}</td>
+        <td class="muted">${c.rank}${deltaChip(c)}</td>
         <td><div class="row" style="flex-wrap:nowrap">${avatar(c)}<div><b>${esc(candName(c))}</b>${c.integrity?.suspicious ? ` <span class="flag inline" data-tip="Possible keyword stuffing">${I('anomaly', 12)}</span>` : ''}<div class="tiny muted">${esc(c.file)}</div></div></div></td>
         <td><div class="scorecell"><b>${Math.round(c.score)}</b>${bar(c.score, scoreColor(c.score))}</div></td>
         <td>${pill(c.verdict.key)}</td>
+        <td><span class="stage-chip" style="--c:${STAGE_C[pipeOf(c).stage]}">${esc(pipeOf(c).stage)}</span></td>
         <td class="num">${c.summary.must_matched}/${S.screen.job.must_units.length}</td>
         <td class="num">${c.summary.years ?? '—'}</td>
         <td class="small" style="max-width:280px">${esc(c.risks[0] || '—')}</td>
@@ -341,7 +349,7 @@ const App = (() => {
       <div class="sec-title">Risks to check</div>
       <ul class="list bad">${c.risks.filter(s => !s.startsWith('Integrity:')).map(s => `<li>${I('alert')}${esc(s)}</li>`).join('') || '<li class="muted">No notable risks.</li>'}</ul>
       <div class="sec-title">Score breakdown</div>
-      ${c.parts.filter(p => p.value !== null).map(p => `<div class="part"><span>${esc(p.label)} ${tip(PART_TIPS[p.key])}<span class="w">weight ${p.weight}%</span></span>
+      ${c.parts.filter(p => p.value !== null).map(p => `<div class="part"><span>${esc(p.label)} ${tip(PART_TIPS[p.key] || '')}<span class="w">weight ${Math.round(+curWeights()[p.key] || p.weight)}</span></span>
         ${bar(p.value, scoreColor(p.value))}<span>${Math.round(p.value)}</span></div>`).join('')}
       <div class="note" style="margin-top:16px">${I('info')}<div>Decision support only. Read the resume and talk to the person before rejecting anyone.
         ${esc(c.confidence.note)}</div></div>`;
@@ -355,6 +363,8 @@ const App = (() => {
       <div class="sec-title">Other skills on the resume</div>
       ${Object.entries(c.extra_skills).map(([cat, list]) => `<div style="margin-bottom:10px"><div class="tiny muted" style="margin-bottom:6px">${esc(cat)}</div><div class="chips">${list.map(s => `<span class="chip">${esc(s)}</span>`).join('')}</div></div>`).join('') || '<span class="muted small">Nothing beyond the job’s list</span>'}`;
     }
+    if (S.tab === 'evidence') body = evidenceTab(c);
+    if (S.tab === 'notes') body = notesTab(c);
     if (S.tab === 'interview') body = `
       <div class="row" style="justify-content:space-between;margin-bottom:12px"><span class="small muted">Questions written from this candidate’s gaps and claims.</span>
         <button class="btn btn-sm" data-act="copy-qs">${I('copy', 14)} Copy all</button></div>
@@ -375,10 +385,10 @@ const App = (() => {
             <button class="icon-btn" data-act="drawer-step" data-d="1" title="Next candidate (→)" aria-label="Next candidate" ${c.rank === S.screen.candidates.length ? 'disabled' : ''}>${I('chevronRight')}</button>
             <button class="icon-btn" data-act="close-drawer" aria-label="Close (Esc)">${I('x')}</button></div>
         </div>
-        <div class="row" style="margin-top:16px;gap:16px">${ring(c.score, 76, 8)}
-          <div class="stack" style="gap:6px">${pill(c.verdict.key)}<span class="small muted">${I('gauge', 13)} Confidence: <b>${c.confidence.level}</b></span>
+        <div class="row" style="margin-top:16px;gap:16px"><button class="ring-btn" data-act="tab" data-t="evidence" data-tip="Explain this score">${ring(c.score, 76, 8)}</button>
+          <div class="stack" style="gap:6px"><div class="row" style="gap:6px">${pill(c.verdict.key)}<span class="stage-chip" style="--c:${STAGE_C[pipeOf(c).stage]}">${esc(pipeOf(c).stage)}</span>${deltaChip(c)}</div><span class="small muted">${I('gauge', 13)} Confidence: <b>${c.confidence.level}</b></span>
             <span class="small muted">${I('target', 13)} ${c.summary.must_matched}/${S.screen.job.must_units.length} must-haves · ${c.summary.years ?? '—'} yrs · ${c.summary.quantified} measurable bullets</span></div></div>
-        <div class="tabs">${tab('overview', 'Decision', 'scale')}${tab('skills', 'Skills', 'target')}${tab('interview', 'Interview kit', 'message')}${tab('feedback', 'Feedback', 'wand')}</div>
+        <div class="tabs">${tab('overview', 'Decision', 'scale')}${tab('evidence', 'Explain', 'search')}${tab('skills', 'Skills', 'target')}${tab('notes', `Notes${pipeOf(c).notes.length ? ` ${pipeOf(c).notes.length}` : ''}`, 'note')}${tab('interview', 'Interview', 'message')}${tab('feedback', 'Feedback', 'wand')}</div>
       </div>
       <div class="drawer-body">${body}</div>
     </aside>`;
@@ -416,12 +426,14 @@ const App = (() => {
         <button class="btn btn-sm btn-ghost" style="color:#fff" data-act="clear-compare">Clear</button></div>`);
       if (S.compareOpen) add(compareModal());
     }
+    if (S.tune && route() === 'screen' && S.screen) add(tunePanel());
+    if (S.detail) add(detailModal());
     if (S.run) add(runOverlay());
     if (S.palette) add(paletteModal());
     if (S.shortcuts) add(shortcutsModal());
     if (S.editor) add(editorModal());
     if (S.confirm) add(confirmModal());
-    document.body.classList.toggle('modal-open', !!(S.editor || S.confirm || S.palette || S.shortcuts || S.run));
+    document.body.classList.toggle('modal-open', !!(S.editor || S.confirm || S.palette || S.shortcuts || S.run || S.detail));
     if (S.drawer && S.drawer !== S.lastDrawer) { if (S.lastDrawer) document.querySelector('.drawer')?.classList.add('no-slide'); animate(); }
     else document.querySelectorAll('.ov [data-count], .ov .ring-arc').forEach(n => { n.dataset.done = '1'; n.style.animation = 'none'; });
     S.lastDrawer = S.drawer;
@@ -460,7 +472,7 @@ const App = (() => {
       <div class="jobs-grid">${[0, 1, 2].map(() => '<div class="sk" style="height:260px"></div>').join('')}</div>`;
     const all = S.jobs, open = all.filter(j => j.status === 'Open');
     const sum = k => all.reduce((a, j) => a + (j[k] || 0), 0);
-    const kpi = (k, label, v, c, help) => `<div class="kpi anim" style="--c:${c}"><div class="k">${I(k, 16)}${label}${help ? tip(help) : ''}</div><div class="v" data-count>${v}</div></div>`;
+    const kpi = (k, label, v, c, help, dk) => `<div class="kpi anim clickable" style="--c:${c}" ${kpiAttrs(dk, label)}><div class="k">${I(k, 16)}${label}<span class="kpi-go">${I('chevronRight', 14)}</span></div><div class="v" data-count>${v}</div>${help ? `<div class="kpi-sub">${esc(help)}</div>` : ''}</div>`;
     const count = st => st === 'All' ? all.length : all.filter(j => j.status === st).length;
     return `
     <div class="page-head anim">
@@ -469,10 +481,10 @@ const App = (() => {
       <button class="btn btn-grad" data-act="new-job">${I('plus', 16)} New job</button>
     </div>
     <div class="kpis k4">
-      ${kpi('briefcase', 'Open roles', open.length, 'var(--c-blue)')}
-      ${kpi('users', 'Open positions', open.reduce((a, j) => a + j.openings, 0), 'var(--c-violet)', 'Headcount still to fill across open roles.')}
-      ${kpi('fileText', 'Resumes screened', sum('candidates_screened'), 'var(--c-teal)', 'Total across all screenings. Only the count is kept, never the resumes.')}
-      ${kpi('star', 'Shortlisted', sum('shortlisted'), 'var(--c-pink)', 'Candidates who reached Strong shortlist or Shortlist.')}
+      ${kpi('briefcase', 'Open roles', open.length, 'var(--c-blue)', `${all.length} in the library`, 'open')}
+      ${kpi('users', 'Open positions', open.reduce((a, j) => a + j.openings, 0), 'var(--c-violet)', 'Headcount still to fill', 'positions')}
+      ${kpi('fileText', 'Resumes screened', sum('candidates_screened'), 'var(--c-teal)', 'Counts only, never the resumes', 'screened')}
+      ${kpi('star', 'Shortlisted', sum('shortlisted'), 'var(--c-pink)', `${pct(sum('shortlisted'), sum('candidates_screened'))}% of screened`, 'rate')}
     </div>
     <div class="toolbar">
       <div class="seg" role="tablist">${['All', ...S.jobMeta.statuses].map(st => `<button class="${S.jobFilter === st ? 'on' : ''}" data-act="job-filter" data-f="${esc(st)}">${esc(st)}<span class="seg-n">${count(st)}</span></button>`).join('')}</div>
@@ -738,12 +750,15 @@ const App = (() => {
 
   /* ---------------------------------------------------------------- method */
   function method() {
-    const W = [['Must-have skills', 38], ['Text relevance', 13], ['Experience', 14], ['Evidence of impact', 12], ['Nice-to-have skills', 10], ['Resume quality', 8], ['Education', 5]];
+    if (!S.model && !S.modelLoading) loadModel();
+    const W = S.model ? S.model.weights.map(w => [w.label, w.weight]).sort((a, b) => b[1] - a[1])
+      : [['Must-have skills', 34], ['Experience', 14], ['Meaning match', 12], ['Evidence of impact', 11], ['Nice-to-have skills', 9], ['Keyword relevance', 8], ['Resume quality', 7], ['Education', 5]];
+    const wmax = Math.max(...W.map(w => w[1]));
     return `
     <div class="page-head anim"><div><h1>How scoring works</h1><p>Every number on screen can be traced to a rule below. No black box, no personal data used.</p></div></div>
     <div class="grid g2">
       <section class="card anim"><div class="card-head"><div><h2><span class="hic">${I('scale')}</span>What the score is made of</h2><p>Weights out of 100. Parts that don’t apply (e.g. no education requirement) are left out and the rest re-weighted.</p></div></div>
-        <div class="card-body weights">${W.map(([l, w]) => `<div class="weight"><span>${l}</span>${bar(w / 38 * 100)}<b>${w}%</b></div>`).join('')}</div></section>
+        <div class="card-body weights">${W.map(([l, w]) => `<div class="weight"><span>${esc(l)}</span>${bar(w / wmax * 100)}<b>${Math.round(w)}%</b></div>`).join('')}</div></section>
       <section class="card anim"><div class="card-head"><div><h2><span class="hic">${I('check')}</span>How a verdict is reached</h2></div></div>
         <div class="card-body stack" style="gap:10px">
           ${[['strong', 'Score 74+, at most 30% of must-haves missing, experience met'], ['shortlist', 'Score 62+ and at most a third of must-haves missing'],
@@ -760,6 +775,7 @@ const App = (() => {
         <div class="card-body"><ul class="list good">
           <li>${I('check')}A skill shown in a job or project bullet counts fully; only in the skills list it counts 70%; work described without naming the tool (“orchestrated DAG workflows” for Airflow) counts 40%.</li>
           <li>${I('check')}Integrity checks catch lines copied from the job, bullets that cram in every tool, and years claimed far above the dated roles. See <a href="#/model">Model quality</a>.</li>
+          <li>${I('check')}Meaning match: a small language model (MiniLM) compares each line of the job with the resume’s work lines, so “orchestrated DAG workflows” counts towards Airflow even without the word.</li>
           <li>${I('check')}Years come from dated roles with overlaps merged, so two parallel jobs are not double counted.</li>
           <li>${I('check')}Evidence rewards measurable results and bullets that start with an action verb.</li>
           <li>${I('check')}Every suggestion’s “+points” is measured by re-scoring your resume with that one fix applied.</li></ul></div></section>
@@ -784,19 +800,22 @@ const App = (() => {
   }
 
   const flagged = () => (S.screen?.candidates || []).filter(c => c.integrity?.suspicious);
-  const resultsView = () => S.view === 'insights' ? insights() : S.view === 'table' ? table() : board();
+  const RTABS = [['board', 'board', 'Board', '1'], ['table', 'table', 'Ranked list', '2'], ['pipeline', 'layers', 'Pipeline', '3'],
+    ['insights', 'segments', 'Insights', '4'], ['fairness', 'scale', 'Fairness', '5']];
+  const resultsView = () => ({ insights, table, pipeline: pipelineView, fairness: fairnessView }[S.view] || board)();
 
   /* The verdict pipeline: one stacked bar, 2px surface gaps, labelled legend below. */
   function pipelineBar(counts, n, compact, head) {
     if (!n) return '';
     const segs = ORDER.filter(k => counts[k]), sl = (counts.strong || 0) + (counts.shortlist || 0);
     return `<section class="pipe anim ${compact ? 'compact' : ''}" aria-label="Verdict mix">
-      ${head ? `<div class="pipe-head"><div><b data-count>${n}</b><span>candidates screened</span></div><div><b>${sl}</b><span>on the shortlist (${pct(sl, n)}%)</span></div>
-        ${flagged().length ? `<div class="warn"><b>${flagged().length}</b><span>flagged for integrity</span></div>` : ''}</div>` : ''}
+      ${head ? `<div class="pipe-head"><div class="ph" ${kpiAttrs('pool', 'Candidates screened')}><b data-count>${n}</b><span>candidates screened</span></div><div class="ph" ${kpiAttrs('short', 'On the shortlist')}><b>${sl}</b><span>on the shortlist (${pct(sl, n)}%)</span></div>
+        ${flagged().length ? `<div class="ph warn" ${kpiAttrs('flags', 'Integrity flags')}><b>${flagged().length}</b><span>flagged for integrity</span></div>` : ''}
+        ${S.weights ? `<span class="chip tuned-chip">${I('scale', 12)} Ranked with your custom weights</span>` : ''}</div>` : ''}
       <div class="pipe-bar" role="img" aria-label="${ORDER.map(k => `${VERD[k].label} ${counts[k] || 0}`).join(', ')}">
         ${segs.map((k, i) => `<i style="flex:${counts[k]};background:${VERD[k].m};--i:${i}" data-tip="${VERD[k].label}: ${counts[k]} of ${n} (${pct(counts[k], n)}%)"></i>`).join('')}
       </div>
-      <div class="pipe-legend">${ORDER.map(k => `<span><i style="background:${VERD[k].m}"></i>${VERD[k].label}<b>${counts[k] || 0}</b><em>${pct(counts[k] || 0, n)}%</em></span>`).join('')}</div>
+      <div class="pipe-legend">${ORDER.map(k => `<span ${head ? kpiAttrs(k, VERD[k].label) : ''}><i style="background:${VERD[k].m}"></i>${VERD[k].label}<b>${counts[k] || 0}</b><em>${pct(counts[k] || 0, n)}%</em></span>`).join('')}</div>
     </section>`;
   }
 
@@ -845,10 +864,10 @@ const App = (() => {
     if (!reco.length) reco.push(['check', 'The pool covers the must-haves well. Start with the strong shortlist.']);
     return `<div class="insights">
       <div class="stats4">
-        <div class="stat anim" style="--c:var(--c-violet)"><span class="sic">${I('gauge', 16)}</span><span>Average score</span><b data-count>${Math.round(avg)}</b><em>median ${Math.round(med)}</em></div>
-        <div class="stat anim" style="--c:var(--c-green)"><span class="sic">${I('star', 16)}</span><span>Shortlist rate</span><b>${pct(d.counts.strong + d.counts.shortlist, n)}%</b><em>${d.counts.strong + d.counts.shortlist} of ${n} candidates</em></div>
-        <div class="stat anim" style="--c:var(--c-pink)"><span class="sic">${I('target', 16)}</span><span>Must-haves nobody has</span><b data-count>${gaps.length}</b><em>of ${d.skill_coverage.length} requirements</em></div>
-        <div class="stat anim" style="--c:var(--c-orange)"><span class="sic">${I('anomaly', 16)}</span><span>Integrity flags</span><b data-count>${fl.length}</b><em>${fl.length ? 'read before deciding' : 'no stuffing detected'}</em></div>
+        <div class="stat anim clickable" style="--c:var(--c-violet)" ${kpiAttrs('avg', 'details')}><span class="sic">${I('gauge', 16)}</span><span>Average score</span><b data-count>${Math.round(avg)}</b><em>median ${Math.round(med)}</em></div>
+        <div class="stat anim clickable" style="--c:var(--c-green)" ${kpiAttrs('short', 'details')}><span class="sic">${I('star', 16)}</span><span>Shortlist rate</span><b>${pct(d.counts.strong + d.counts.shortlist, n)}%</b><em>${d.counts.strong + d.counts.shortlist} of ${n} candidates</em></div>
+        <div class="stat anim clickable" style="--c:var(--c-pink)" ${kpiAttrs('gaps', 'details')}><span class="sic">${I('target', 16)}</span><span>Must-haves nobody has</span><b data-count>${gaps.length}</b><em>of ${d.skill_coverage.length} requirements</em></div>
+        <div class="stat anim clickable" style="--c:var(--c-orange)" ${kpiAttrs('flags', 'details')}><span class="sic">${I('anomaly', 16)}</span><span>Integrity flags</span><b data-count>${fl.length}</b><em>${fl.length ? 'read before deciding' : 'no stuffing detected'}</em></div>
       </div>
       <div class="grid g2">
         <section class="card anim"><div class="card-head"><div><h2><span class="hic" style="--c:var(--c-violet)">${I('trendUp', 16)}</span>Score distribution</h2><p>Candidates per 10-point band. Lines mark the verdict thresholds: 48 Interview to verify, 62 Shortlist, 74 Strong shortlist.</p></div></div>
@@ -874,7 +893,7 @@ const App = (() => {
   function overviewPage() {
     const jobs = S.jobs || [], open = jobs.filter(j => j.status === 'Open');
     const screened = jobs.reduce((a, j) => a + (j.candidates_screened || 0), 0), short = jobs.reduce((a, j) => a + (j.shortlisted || 0), 0);
-    const kpi = (k, label, v, sub, c, suffix = '') => `<div class="kpi anim" style="--c:${c}"><div class="k">${I(k, 16)}${label}</div><div class="v"><span data-count>${v}</span>${suffix}</div><div class="kpi-sub">${sub}</div></div>`;
+    const kpi = (k, label, v, sub, c, suffix = '', dk) => `<div class="kpi anim clickable" style="--c:${c}" ${kpiAttrs(dk, label)}><div class="k">${I(k, 16)}${label}<span class="kpi-go">${I('chevronRight', 14)}</span></div><div class="v"><span data-count>${v}</span>${suffix}</div><div class="kpi-sub">${sub}</div></div>`;
     const tot = { strong: 0, shortlist: 0, verify: 0, reject: 0 };
     S.activity.forEach(a => ORDER.forEach(k => tot[k] += a.counts[k]));
     const sessN = S.activity.reduce((a, x) => a + x.n, 0), ev = S.model?.evaluation;
@@ -883,10 +902,10 @@ const App = (() => {
     <div class="page-head anim"><div><h1>Hiring overview</h1>
       <p>Open roles, screening activity and how far you can trust the screener, on one page.</p></div></div>
     <div class="kpis k4">
-      ${kpi('briefcase', 'Open roles', open.length, `${jobs.length} in the library`, 'var(--c-blue)')}
-      ${kpi('users', 'Positions to fill', open.reduce((a, j) => a + j.openings, 0), 'across open roles', 'var(--c-violet)')}
-      ${kpi('fileText', 'Resumes screened', screened, 'all time, counts only', 'var(--c-teal)')}
-      ${kpi('star', 'Shortlist rate', pct(short, screened), `${short} shortlisted`, 'var(--c-pink)', '%')}
+      ${kpi('briefcase', 'Open roles', open.length, `${jobs.length} in the library`, 'var(--c-blue)', '', 'open')}
+      ${kpi('users', 'Positions to fill', open.reduce((a, j) => a + j.openings, 0), 'across open roles', 'var(--c-violet)', '', 'positions')}
+      ${kpi('fileText', 'Resumes screened', screened, 'all time, counts only', 'var(--c-teal)', '', 'screened')}
+      ${kpi('star', 'Shortlist rate', pct(short, screened), `${short} shortlisted`, 'var(--c-pink)', '%', 'rate')}
     </div>
     <div class="grid g-ov" style="margin-top:16px">
       <div class="stack">
@@ -896,7 +915,8 @@ const App = (() => {
             ${pipelineBar(tot, sessN, true)}
             <div class="feed">${S.activity.map((a, i) => `<div class="feed-row" style="--i:${i}"><span class="hic">${I('users', 15)}</span>
               <div><b>${esc(a.title)}</b><div class="small muted">${a.n} candidate${a.n > 1 ? 's' : ''} · ${a.counts.strong + a.counts.shortlist} shortlisted${a.flags ? ` · ${a.flags} flagged` : ''}</div></div>
-              <span class="tiny muted">${ago(a.at)}</span></div>`).join('')}</div>`
+              <span class="tiny muted">${ago(a.at)}</span><button class="icon-btn danger sm" data-act="rm-activity" data-i="${i}" aria-label="Remove from this list">${I('x', 14)}</button></div>`).join('')}</div>
+            <button class="btn btn-sm btn-ghost" style="margin-top:8px" data-act="clear-activity">${I('trash', 14)} Clear session list</button>`
             : `<div class="empty-mini big">${I('play', 24)}<b>No screenings yet</b><span class="small muted">Run the sample to see a full ranked board, insights and interview kits in about a second.</span>
               <button class="btn btn-grad" data-act="demo-screen">${I('play', 15)} Run a sample screening</button></div>`}</div></section>
         <section class="card anim"><div class="card-head"><div><h2><span class="hic" style="--c:var(--c-blue)">${I('briefcase', 16)}</span>Open roles</h2><p>Screen new applicants against a saved job in one click.</p></div>
@@ -932,7 +952,7 @@ const App = (() => {
   /* ---------------------------------------------------------------- model quality */
   async function loadModel() {
     S.modelLoading = true;
-    try { S.model = await api('/api/model'); navTags(); if (['model', 'overview'].includes(route()) && !S.editor) render(false); }
+    try { S.model = await api('/api/model'); navTags(); if (['model', 'overview', 'method'].includes(route()) && !S.editor) render(false); }
     catch (e) { toast(e.message, true); } finally { S.modelLoading = false; }
   }
 
@@ -942,21 +962,22 @@ const App = (() => {
     const m = S.model, ev = m.evaluation, prev = m.history.length > 1 ? m.history[m.history.length - 2] : null;
     const delta = (v, p, fmt, pctp) => p == null ? '' : (() => { const d = v - p; if (Math.abs(d) < 1e-9) return '<em class="flat">no change</em>';
       return `<em class="${d > 0 ? 'up' : 'down'}">${I(d > 0 ? 'trendUp' : 'trendDown', 12)}${d > 0 ? '+' : ''}${pctp ? (d * 100).toFixed(1) + ' pts' : fmt(d)} vs v${prev.version}</em>`; })();
-    const tile = (label, val, sub, dl, help, c, ic) => `<div class="mtile anim" style="--c:${c}"><div class="k">${I(ic, 16)}${label}${tip(help)}</div><div class="v">${val}</div>${dl || ''}<div class="kpi-sub">${sub}</div></div>`;
+    const tile = (label, val, sub, dl, help, c, ic, dk) => `<div class="mtile anim clickable" style="--c:${c}" ${kpiAttrs(dk, label)}><div class="k">${I(ic, 16)}${label}<span class="kpi-go">${I('chevronRight', 14)}</span></div><div class="v">${val}</div>${dl || ''}<div class="kpi-sub">${sub}</div></div>`;
     if (!ev) return `<div class="page-head"><div><h1>Model quality</h1><p>The labelled evaluation set is not included in this deployment.</p></div></div>`;
     const maxC = Math.max(...ev.confusion.flat());
     const labels = { reject: 'Not a fit', maybe: 'Interview to verify', shortlist: 'Shortlist' };
     return `
     <div class="page-head anim"><div><h1>Model quality</h1>
       <p>How often the screener agrees with a person, measured on ${ev.n} labelled resume–job pairs. Rules, weights and results are all on this page.</p></div>
-      <span class="pill v-shortlist"><i class="dot"></i>Engine v${esc(m.version)}</span></div>
+      <div class="row" style="gap:8px"><span class="pill ${m.model?.semantic?.available ? 'v-strong' : 'v-verify'}"><i class="dot"></i>${m.model?.semantic?.available ? 'Meaning match on' : 'Keyword matching only'}</span>
+        <span class="pill v-shortlist"><i class="dot"></i>Engine v${esc(m.version)}</span></div></div>
     <div class="mtiles">
-      ${tile('Verdict accuracy', `${(ev.accuracy * 100).toFixed(1)}%`, 'shortlist / maybe / reject', delta(ev.accuracy, prev?.accuracy, null, true), 'Share of pairs where the verdict class matches the human label.', 'var(--c-blue)', 'check')}
-      ${tile('Weighted kappa', ev.kappa.toFixed(2), 'agreement beyond chance', delta(ev.kappa, prev?.kappa, d => d.toFixed(2)), 'Cohen’s kappa with linear weights: a one-step miss costs half a two-step miss. 0.61–0.80 is substantial agreement.', 'var(--c-iris)', 'scale')}
-      ${tile('Spearman rho', ev.spearman.toFixed(2), 'score order vs labels', delta(ev.spearman, prev?.spearman, d => d.toFixed(2)), 'Whether higher scores go to the people a human rated higher.', 'var(--c-violet)', 'trendUp')}
-      ${tile('Precision at 3', `${Math.round(ev.p_at_3 * 100)}%`, 'top 3 per job worth interviewing', delta(ev.p_at_3, prev?.p_at_3, null, true), 'For each job, the share of the top three candidates a person labelled shortlist or maybe.', 'var(--c-teal)', 'target')}
-      ${tile('Stuffers caught', `${ev.stuffers_caught}/${ev.stuffers}`, 'kept off the shortlist', prev ? delta(ev.stuffers_caught, prev.stuffers_caught, d => `${d}`) : '', 'Resumes that paste the job description or cram every tool into one line.', 'var(--c-orange)', 'shield')}
-      ${tile('Good candidates rejected', `${ev.false_rejections}/${ev.good}`, 'labelled shortlist or maybe', '', 'The costliest error for a screener: someone worth talking to who gets Not a fit.', 'var(--c-pink)', 'alert')}
+      ${tile('Verdict accuracy', `${(ev.accuracy * 100).toFixed(1)}%`, 'shortlist / maybe / reject', delta(ev.accuracy, prev?.accuracy, null, true), 'Share of pairs where the verdict class matches the human label.', 'var(--c-blue)', 'check', 'm-accuracy')}
+      ${tile('Weighted kappa', ev.kappa.toFixed(2), 'agreement beyond chance', delta(ev.kappa, prev?.kappa, d => d.toFixed(2)), 'Cohen’s kappa with linear weights: a one-step miss costs half a two-step miss. 0.61–0.80 is substantial agreement.', 'var(--c-iris)', 'scale', 'm-kappa')}
+      ${tile('Spearman rho', ev.spearman.toFixed(2), 'score order vs labels', delta(ev.spearman, prev?.spearman, d => d.toFixed(2)), 'Whether higher scores go to the people a human rated higher.', 'var(--c-violet)', 'trendUp', 'm-spearman')}
+      ${tile('Precision at 3', `${Math.round(ev.p_at_3 * 100)}%`, 'top 3 per job worth interviewing', delta(ev.p_at_3, prev?.p_at_3, null, true), 'For each job, the share of the top three candidates a person labelled shortlist or maybe.', 'var(--c-teal)', 'target', 'm-p3')}
+      ${tile('Stuffers caught', `${ev.stuffers_caught}/${ev.stuffers}`, 'kept off the shortlist', prev ? delta(ev.stuffers_caught, prev.stuffers_caught, d => `${d}`) : '', 'Resumes that paste the job description or cram every tool into one line.', 'var(--c-orange)', 'shield', 'm-stuffers')}
+      ${tile('Good candidates rejected', `${ev.false_rejections}/${ev.good}`, 'labelled shortlist or maybe', '', 'The costliest error for a screener: someone worth talking to who gets Not a fit.', 'var(--c-pink)', 'alert', 'm-fr')}
     </div>
     <div class="grid g2" style="margin-top:16px">
       <section class="card anim"><div class="card-head"><div><h2><span class="hic" style="--c:var(--c-iris)">${I('table', 16)}</span>Confusion matrix</h2><p>Rows are the human label, columns the engine’s verdict. The diagonal is agreement.</p></div></div>
@@ -971,9 +992,10 @@ const App = (() => {
             <td class="num">${(h.accuracy * 100).toFixed(1)}%</td><td class="num">${h.kappa.toFixed(2)}</td><td class="num">${h.spearman.toFixed(2)}</td>
             <td class="num">${Math.round(h.p_at_3 * 100)}%</td><td class="num">${h.stuffers_caught}/${ev.stuffers}</td></tr>`).join('')}</tbody></table></div>
           <ul class="list good" style="margin-top:14px">
+            <li>${I('check')}v2.3 added meaning-based matching with a small sentence-embedding model (MiniLM), and weights you can learn from labelled decisions.</li>
             <li>${I('check')}v2.2 added integrity checks, partial credit for work described without tool names, and batch-independent scores.</li></ul></div></section>
       <section class="card anim"><div class="card-head"><div><h2><span class="hic" style="--c:var(--c-amber)">${I('scale', 16)}</span>Score weights</h2><p>Parts that don’t apply are dropped and the rest re-weighted.</p></div></div>
-        <div class="card-body weights">${m.weights.map(w => `<div class="weight"><span>${esc(w.label)}</span>${bar(w.weight / 38 * 100)}<b>${w.weight}%</b></div>`).join('')}
+        <div class="card-body weights">${m.weights.map(w => `<div class="weight"><span>${esc(w.label)}</span>${bar(w.weight / Math.max(...m.weights.map(x => x.weight)) * 100)}<b>${Math.round(w.weight)}%</b></div>`).join('')}
           <div class="credit-row">${[['Shown in a bullet', m.credits.shown, 'shown'], ['Only in the skills list', m.credits.listed, 'listed'], ['Described, not named', m.credits.related, 'related']]
             .map(([l, v, c]) => `<div><span class="chip ${c}"><i class="dot"></i>${Math.round(v * 100)}%</span><span class="small muted">${l}</span></div>`).join('')}</div></div></section>
       <section class="card anim"><div class="card-head"><div><h2><span class="hic" style="--c:var(--c-orange)">${I('shield', 16)}</span>Integrity rules</h2><p>Each finding costs points (capped at ${m.integrity.cap}) and is shown to the recruiter.</p></div></div>
@@ -983,14 +1005,38 @@ const App = (() => {
           <div><span class="hic">${I('clock', 15)}</span><div><b>Years claimed far above dated roles</b><p class="small muted">More than ${m.integrity.years_gap} years over: the dated figure is used. −${m.integrity.penalties.years} points.</p></div></div>
         </div></div></section>
     </div>
+    ${trainingCard(m)}
     <section class="card anim" style="margin-top:16px"><div class="card-head"><div><h2><span class="hic" style="--c:var(--c-pink)">${I('alert', 16)}</span>Where the engine and the labels disagree</h2><p>${ev.disagreements.length} of ${ev.n} pairs. Each one is a lead for the next improvement.</p></div></div>
       <div style="overflow-x:auto"><table class="tbl"><thead><tr><th>Resume</th><th>Job</th><th>Human label</th><th>Engine verdict</th><th class="num">Score</th><th>Why the label</th></tr></thead>
         <tbody>${ev.disagreements.map(d => `<tr class="static"><td><b>${esc(d.resume)}</b></td><td>${esc(ev.jobs[d.job] || d.job)}</td><td>${esc(labels[d.label])}</td><td>${esc(d.verdict)}</td><td class="num">${d.score}</td><td class="small muted">${esc(d.note)}</td></tr>`).join('')}</tbody></table></div></section>
     <div class="note anim" style="margin-top:16px">${I('info')}<div><b>How to read these numbers.</b> The resumes are fictional and the labels were written by the project author before the engine ran on them, so this is a regression baseline that shows the method, not a claim about real-world accuracy. Real recruiter labels on anonymised resumes are the next step.</div></div>`;
   }
 
+  function trainingCard(m) {
+    const tr = m.model?.training, labels = m.model?.labels || {};
+    if (!tr) return '';
+    const hand = m.model.hand_weights, learned = tr.weights, cur = m.model.weights;
+    const mx = Math.max(...Object.values(hand), ...Object.values(learned));
+    const met = (x, k) => k === 'accuracy' || k === 'p_at_3' ? `${(x[k] * 100).toFixed(1)}%` : x[k].toFixed(2);
+    const rows = [['Hand-set weights', tr.hand_metrics], ['Learned, tested on unseen resumes', tr.cross_validated], ['Learned, on the data it was fitted to', tr.in_sample]];
+    return `<section class="card anim" style="margin-top:16px"><div class="card-head"><div><h2><span class="hic" style="--c:var(--c-violet)">${I('spark', 16)}</span>How the weights were chosen</h2>
+        <p>Weights are learned from the labelled set, then tested on resumes the fit never saw (leave-one-resume-out). Learned weights are used only when they beat the hand-set ones on that test.</p></div>
+        <span class="pill ${tr.adopted ? 'v-strong' : 'v-verify'}"><i class="dot"></i>${tr.adopted ? 'Learned weights in use' : 'Hand-set weights in use'}</span></div>
+      <div class="card-body grid g2">
+        <div><div class="wcmp-legend small muted"><span><i class="hand"></i>Hand-set</span><span><i class="learned"></i>Learned</span></div>
+          ${Object.keys(hand).map(k => `<div class="wcmp"><span>${esc(labels[k] || k)}</span><span class="wcmp-bars"><i class="hand" style="width:${hand[k] / mx * 100}%"></i><i class="learned" style="width:${learned[k] / mx * 100}%"></i></span>
+            <b>${Math.round(cur[k])}</b></div>`).join('')}
+          <p class="tiny muted" style="margin-top:8px">The number on the right is the weight in use now.</p></div>
+        <div><table class="tbl"><thead><tr><th></th><th class="num">Accuracy</th><th class="num">Kappa</th><th class="num">Spearman</th><th class="num">Rejected good</th></tr></thead>
+          <tbody>${rows.map(([l, x]) => `<tr class="static"><td>${l}</td><td class="num">${met(x, 'accuracy')}</td><td class="num">${met(x, 'kappa')}</td><td class="num">${met(x, 'spearman')}</td><td class="num">${x.false_rejections}/${x.good}</td></tr>`).join('')}</tbody></table>
+          <div class="note ${tr.adopted ? '' : 'warn'}" style="margin-top:12px">${I(tr.adopted ? 'check' : 'info')}<div>${tr.adopted
+            ? 'The learned weights beat the hand-set ones on unseen resumes, so they are in use.'
+            : `On ${tr.trained_on} labelled pairs the learned weights do not beat the hand-set ones on unseen resumes, so the hand-set weights stay. More real recruiter labels are what will make learning pay off.`}</div></div></div>
+      </div></section>`;
+  }
+
   /* ---------------------------------------------------------------- the screening run */
-  const STAGES = [['fileText', 'Reading resumes'], ['target', 'Matching skills to the job'], ['shield', 'Running integrity checks'], ['scale', 'Scoring seven parts'], ['board', 'Ranking and deciding']];
+  const STAGES = [['fileText', 'Reading resumes'], ['target', 'Matching skills to the job'], ['compass', 'Matching by meaning'], ['shield', 'Running integrity checks'], ['board', 'Scoring and ranking']];
   function runOverlay() {
     const r = S.run;
     return `<div class="modal-scrim run-scrim"><div class="run" role="dialog" aria-modal="true" aria-label="Screening in progress">
@@ -1019,8 +1065,7 @@ const App = (() => {
       { l: 'Try candidate coaching with a sample', ic: 'wand', g: 'Actions', run: () => document.dispatchEvent(new CustomEvent('ri-act', { detail: 'demo-improve' })) },
       { l: `Switch to ${document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'} theme`, ic: 'moon', g: 'Preferences', run: () => $('theme').click() },
       { l: `${S.blind ? 'Show' : 'Hide'} candidate names`, ic: S.blind ? 'eye' : 'eyeOff', g: 'Preferences', run: () => { S.blind = !S.blind; store.set('ri2-blind', S.blind ? 'on' : 'off'); render(false); } },
-      { l: 'Keyboard shortcuts', ic: 'keyboard', k: '?', g: 'Preferences', run: () => { S.shortcuts = true; renderOverlays(); } },
-      { l: 'API reference', ic: 'book', g: 'Help', run: () => window.open('/api/docs', '_blank', 'noopener') }];
+      { l: 'Keyboard shortcuts', ic: 'keyboard', k: '?', g: 'Preferences', run: () => { S.shortcuts = true; renderOverlays(); } }];
     (S.jobs || []).filter(j => j.status !== 'Closed').forEach(j => list.push({ l: `Screen against ${j.title}`, sub: j.department, ic: 'briefcase', g: 'Jobs',
       run: () => { useJob(j); S.screen = null; S.drawer = null; S.compare.clear(); if (route() === 'screen') render(); else location.hash = '#/screen'; } }));
     (S.screen?.candidates || []).forEach(c => list.push({ l: candName(c), sub: `${Math.round(c.score)} · ${c.verdict.label}`, ic: 'user', g: 'Candidates',
@@ -1057,6 +1102,334 @@ const App = (() => {
   }
 
 
+  /* ================================================================ v2.3: interactive layer
+     Everything here works on the screening already in the browser: re-weighting,
+     removing candidates, pipeline stages, notes, tags and fairness groups never go
+     back to the server and are kept only until the tab is closed. */
+  const NEXT = {
+    strong: 'Move to a hiring-manager interview this week.',
+    shortlist: 'Book a technical screen focused on the risks listed.',
+    verify: 'Run a short phone screen to check the gaps before investing more time.',
+    reject: 'Decline politely, or keep on file for a more junior or different role.',
+  };
+  const PART_C = { must: 'var(--c-iris)', nice: 'var(--c-violet)', experience: 'var(--c-blue)', education: 'var(--c-amber)',
+    similarity: 'var(--c-teal)', semantic: 'var(--c-green)', evidence: 'var(--c-orange)', quality: 'var(--c-pink)' };
+  const PSTAGES = ['New', 'Phone screen', 'Interview', 'Offer', 'Hired', 'Rejected'];
+  const STAGE_C = { 'New': 'var(--c-iris)', 'Phone screen': 'var(--c-blue)', 'Interview': 'var(--c-violet)', 'Offer': 'var(--c-amber)', 'Hired': 'var(--c-green)', 'Rejected': 'var(--slate)' };
+  const TAG_IDEAS = ['Strong communicator', 'Referral', 'Relocation needed', 'Salary check', 'Notice period', 'Re-check later'];
+  const PRESETS = {
+    'Skills first': { must: 44, nice: 12, experience: 8, education: 2, similarity: 6, semantic: 16, evidence: 8, quality: 4 },
+    'Experience first': { must: 28, nice: 6, experience: 30, education: 6, similarity: 6, semantic: 10, evidence: 10, quality: 4 },
+    'Impact first': { must: 28, nice: 6, experience: 12, education: 2, similarity: 6, semantic: 10, evidence: 28, quality: 8 },
+  };
+
+  const modelWeights = () => S.screen?.model?.weights || {};
+  const curWeights = () => S.weights || modelWeights();
+  const pipeOf = c => (S.pipe[c.file] ||= { stage: 'New', tags: [], notes: [] });
+  const isShort = c => c.verdict.key === 'strong' || c.verdict.key === 'shortlist';
+
+  function jsVerdict(score, vi, mustTotal) {
+    const knock = [];
+    if (vi.suspicious) knock.push('Possible keyword stuffing: check the resume yourself');
+    if (mustTotal && vi.miss_ratio > 0.5) knock.push(`Missing ${Math.round(vi.missing_ratio * mustTotal)} of ${mustTotal} must-have skills`);
+    if (vi.experience < 0.45) knock.push('Well short of the required experience');
+    const hard = knock.filter(k => !k.startsWith('Possible'));
+    let key;
+    if (hard.length && (vi.miss_ratio > 0.5 || score < 55)) key = 'reject';
+    else if (vi.suspicious) key = score >= 48 ? 'verify' : 'reject';
+    else if (score >= 74 && vi.miss_ratio <= 0.3 && vi.experience >= 0.8) key = 'strong';
+    else if (score >= 62 && vi.miss_ratio <= 0.34) key = 'shortlist';
+    else if (score >= 48) key = 'verify';
+    else key = 'reject';
+    return { key, knockouts: knock };
+  }
+
+  /* Re-score with the current weights, then re-rank and rebuild every pool total. */
+  function recompute() {
+    const d = S.screen; if (!d) return;
+    const W = curWeights(), mt = d.job.must_units.length;
+    d.candidates.forEach(c => {
+      c.base ||= { score: c.score, verdict: c.verdict, rank: c.rank };
+      if (!S.weights) { c.score = c.base.score; c.verdict = c.base.verdict; return; }
+      let num = 0, den = 0;
+      c.parts.forEach(p => { if (p.value == null) return; const w = +W[p.key] || 0; num += w * p.value; den += w; });
+      c.score = Math.round(Math.max(0, (den ? num / den : 0) - c.verdict_inputs.penalty) * 10) / 10;
+      const v = jsVerdict(c.score, c.verdict_inputs, mt);
+      c.verdict = { key: v.key, label: VERD[v.key].label, next: NEXT[v.key], knockouts: v.knockouts };
+    });
+    const order = { strong: 0, shortlist: 1, verify: 2, reject: 3 };
+    d.candidates.sort((a, b) => order[a.verdict.key] - order[b.verdict.key] || b.score - a.score);
+    d.candidates.forEach((c, i) => { c.rank = i + 1; });
+    d.counts = { strong: 0, shortlist: 0, verify: 0, reject: 0 };
+    d.candidates.forEach(c => d.counts[c.verdict.key]++);
+    d.skill_coverage = d.job.must_units.map(s => ({ skill: s, of: d.candidates.length,
+      have: d.candidates.filter(c => c.skills.some(r => r.skill === s && (r.status === 'shown' || r.status === 'listed'))).length }));
+  }
+
+  function refreshResults() {
+    if (route() !== 'screen' || !S.screen) return;
+    const y = scrollY;
+    $('page').innerHTML = screenResults();
+    $('top-actions').innerHTML = topActions('screen');
+    navTags(); scrollTo(0, y);
+  }
+
+  const rankDelta = c => (S.weights && c.base) ? c.base.rank - c.rank : 0;
+  const deltaChip = c => { const d = rankDelta(c); return d ? `<span class="rk ${d > 0 ? 'up' : 'down'}" data-tip="Rank ${d > 0 ? 'up' : 'down'} ${Math.abs(d)} with your weights">${I(d > 0 ? 'trendUp' : 'trendDown', 11)}${Math.abs(d)}</span>` : ''; };
+
+  /* ---------------------------------------------------------------- weight tuning */
+  function tunePanel() {
+    const W = curWeights(), M = modelWeights(), labels = S.screen.model.labels;
+    const total = Object.values(W).reduce((a, b) => a + (+b || 0), 0) || 1;
+    return `<aside class="tune" role="dialog" aria-label="Tune weights">
+      <div class="tune-head"><div><h2><span class="hic" style="--c:var(--c-violet)">${I('scale', 16)}</span>Tune weights</h2>
+        <p class="small muted">Change how much each part counts. Ranks and verdicts update live for this screening only.</p></div>
+        <button class="icon-btn" data-act="close-tune" aria-label="Close">${I('x')}</button></div>
+      <div class="tune-presets">${Object.keys(PRESETS).map(p => `<button class="chip outline" data-act="preset" data-p="${esc(p)}">${esc(p)}</button>`).join('')}</div>
+      <div class="tune-list">${Object.keys(M).map(k => `<label class="tune-row" style="--c:${PART_C[k]}">
+        <span class="tr-name"><i></i>${esc(labels[k])}</span>
+        <input type="range" min="0" max="50" step="1" value="${Math.round(+W[k] || 0)}" data-w="${k}" aria-label="${esc(labels[k])} weight">
+        <b id="tw-${k}">${Math.round((+W[k] || 0) / total * 100)}%</b></label>`).join('')}</div>
+      ${tuneFoot()}
+    </aside>`;
+  }
+  const tuneFoot = () => `<div class="tune-foot" id="tune-foot">
+        <span class="small muted">${S.weights ? `${I('alert', 13)} Custom weights in use` : `${I('check', 13)} Model weights`}</span>
+        <button class="btn btn-sm" data-act="reset-weights" ${S.weights ? '' : 'disabled'}>${I('refresh', 14)} Reset to model</button></div>`;
+
+  function setWeight(k, v) {
+    S.weights = { ...curWeights(), [k]: v };
+    if (Object.values(S.weights).every(x => !+x)) S.weights[k] = 1;
+    recompute(); refreshResults(); updateTuneLabels();
+  }
+  function updateTuneLabels() {
+    const W = curWeights(), total = Object.values(W).reduce((a, b) => a + (+b || 0), 0) || 1;
+    Object.keys(W).forEach(k => { const b = $(`tw-${k}`); if (b) b.textContent = `${Math.round((+W[k] || 0) / total * 100)}%`; });
+    const f = $('tune-foot'); if (f) f.outerHTML = tuneFoot();
+  }
+
+  /* ---------------------------------------------------------------- remove & undo */
+  function removeCandidate(id) {
+    const d = S.screen, i = d.candidates.findIndex(c => c.id === id); if (i < 0) return;
+    const [c] = d.candidates.splice(i, 1);
+    S.compare.delete(id); if (S.drawer === id) S.drawer = null;
+    recompute(); refreshResults(); renderOverlays();
+    toast(`${candName(c)} removed from this screening`, false, { label: 'Undo', run: () => { d.candidates.push(c); recompute(); refreshResults(); renderOverlays(); } });
+  }
+
+  /* ---------------------------------------------------------------- pipeline */
+  function pipelineView() {
+    const list = filtered();
+    return `<div class="pboard">${PSTAGES.map(st => {
+      const items = list.filter(c => pipeOf(c).stage === st);
+      return `<div class="pcol" data-stage="${esc(st)}" style="--c:${STAGE_C[st]}">
+        <div class="pcol-head"><span class="pdot"></span><b>${esc(st)}</b><span class="n">${items.length}</span></div>
+        <div class="pcol-body">${items.map(c => { const p = pipeOf(c);
+          return `<article class="pcard" draggable="true" data-cand="${c.id}" tabindex="0" aria-label="${esc(candName(c))}, ${esc(st)}">
+            <div class="row" style="flex-wrap:nowrap">${avatar(c)}<div class="who"><b>${esc(candName(c))}</b><span>${pill(c.verdict.key)}</span></div><span class="ps">${Math.round(c.score)}</span></div>
+            ${p.tags.length ? `<div class="chips" style="margin-top:8px">${p.tags.slice(0, 3).map(t => `<span class="chip tag">${esc(t)}</span>`).join('')}</div>` : ''}
+            ${p.notes.length ? `<div class="tiny muted" style="margin-top:6px">${I('note', 12)} ${p.notes.length} note${p.notes.length > 1 ? 's' : ''}</div>` : ''}
+          </article>`; }).join('') || '<div class="empty-col">Drop candidates here</div>'}</div></div>`;
+    }).join('')}</div>
+    <p class="small muted" style="margin-top:10px">${I('info', 13)} Drag cards between stages, or set the stage in a candidate's Notes tab. Stages, notes and tags stay in this browser tab only.</p>`;
+  }
+
+  function setStage(id, stage) {
+    const c = S.screen.candidates.find(x => x.id === id); if (!c) return;
+    const prev = pipeOf(c).stage; if (prev === stage) return;
+    pipeOf(c).stage = stage;
+    if (S.view === 'pipeline') { $('results').innerHTML = resultsView(); }
+    if (S.drawer === id) renderOverlays();
+    toast(`${candName(c)} moved to ${stage}`, false, { label: 'Undo', run: () => { pipeOf(c).stage = prev; if (S.view === 'pipeline') $('results').innerHTML = resultsView(); if (S.drawer === id) renderOverlays(); } });
+  }
+
+  /* ---------------------------------------------------------------- fairness */
+  const FAIR_ATTRS = {
+    experience: { label: 'Experience band', of: c => c.summary.years == null ? 'Unknown' : c.summary.years < 2 ? 'Under 2 years' : c.summary.years < 5 ? '2–5 years' : '5+ years' },
+    education: { label: 'Education level', of: c => c.summary.education || 'Not found' },
+    length: { label: 'Resume length', of: c => c.summary.word_count < 250 ? 'Short (under 250 words)' : c.summary.word_count < 600 ? 'Medium (250–600)' : 'Long (600+)' },
+    custom: { label: 'Your own groups', of: c => S.groups[c.file] || 'Unassigned' },
+  };
+  function fairnessData() {
+    const cs = S.screen.candidates, attr = FAIR_ATTRS[S.fair.attr];
+    const scores = cs.map(c => c.score).sort((a, b) => a - b), med = scores.length ? scores[Math.floor((scores.length - 1) / 2)] : 0;
+    const sel = c => S.fair.outcome === 'shortlist' ? isShort(c) : c.score > med;
+    const g = {};
+    cs.forEach(c => { const k = attr.of(c); (g[k] ||= { group: k, n: 0, sel: 0, ids: [] }); g[k].n++; g[k].ids.push(c.id); if (sel(c)) g[k].sel++; });
+    const rows = Object.values(g).map(r => ({ ...r, rate: r.n ? r.sel / r.n : 0 }));
+    const best = Math.max(0, ...rows.filter(r => r.n >= 2).map(r => r.rate), ...(rows.every(r => r.n < 2) ? rows.map(r => r.rate) : []));
+    rows.forEach(r => { r.ratio = best ? r.rate / best : null; });
+    rows.sort((a, b) => b.rate - a.rate || b.n - a.n);
+    return { rows, med, best };
+  }
+  function fairnessView() {
+    const { rows, med, best } = fairnessData(), low = rows.filter(r => r.ratio != null && r.ratio < 0.8 && r.n >= 5);
+    const small = rows.some(r => r.n < 5);
+    return `<div class="fair">
+      <section class="card anim"><div class="card-head"><div><h2><span class="hic" style="--c:var(--c-teal)">${I('scale', 16)}</span>Fairness audit</h2>
+        <p>Compare how often each group is selected. A group whose rate is under 80% of the best group's (the four-fifths rule) deserves a closer look.</p></div></div>
+        <div class="card-body">
+          <div class="fair-controls">
+            <label class="fld"><span class="label">Group candidates by</span><select data-fair="attr">${Object.entries(FAIR_ATTRS).map(([k, a]) => `<option value="${k}" ${S.fair.attr === k ? 'selected' : ''}>${esc(a.label)}</option>`).join('')}</select></label>
+            <label class="fld"><span class="label">Count as selected</span><select data-fair="outcome">
+              <option value="shortlist" ${S.fair.outcome === 'shortlist' ? 'selected' : ''}>Strong shortlist or Shortlist</option>
+              <option value="scoring" ${S.fair.outcome === 'scoring' ? 'selected' : ''}>Scored above the pool median (${Math.round(med)})</option></select></label>
+          </div>
+          ${low.length ? `<div class="note warn" style="margin-top:14px">${I('alert')}<div><b>${low.map(r => esc(r.group)).join(', ')}</b> ${low.length > 1 ? 'are' : 'is'} selected at under 80% of the best group's rate. Check whether the job's requirements or the scoring explain the gap.</div></div>`
+            : `<div class="note" style="margin-top:14px">${I('check')}<div>No group with 5 or more candidates falls under the four-fifths line.</div></div>`}
+          <div class="fair-table"><table class="tbl"><thead><tr><th>Group</th><th class="num">Candidates</th><th class="num">Selected</th><th>Selection rate</th><th class="num">Impact ratio</th></tr></thead>
+            <tbody>${rows.map(r => `<tr class="static">
+              <td><b>${esc(r.group)}</b>${r.n < 5 ? ' <span class="tiny muted">too few to judge</span>' : ''}</td>
+              <td class="num">${r.n}</td><td class="num">${r.sel}</td>
+              <td><div class="fair-bar" data-tip="${esc(r.group)}: ${r.sel} of ${r.n} selected"><i style="width:${Math.max(r.rate * 100, 1)}%"></i>${best ? `<em style="left:${best * 80}%"></em>` : ''}</div><span class="tiny">${Math.round(r.rate * 100)}%</span></td>
+              <td class="num"><span class="ratio ${r.ratio == null || r.n < 5 ? '' : r.ratio < 0.8 ? 'bad' : 'ok'}">${r.ratio == null ? '—' : r.ratio.toFixed(2)}</span></td></tr>`).join('')}</tbody></table></div>
+          ${small ? `<p class="tiny muted" style="margin-top:8px">Groups with fewer than 5 candidates are shown but not flagged: a rate based on 1–4 people says little.</p>` : ''}
+          <p class="tiny muted" style="margin-top:6px">The dashed mark on each bar is 80% of the best group's rate.</p>
+        </div></section>
+      ${S.fair.attr === 'custom' ? `<section class="card anim" style="margin-top:16px"><div class="card-head"><div><h2><span class="hic" style="--c:var(--c-pink)">${I('users', 16)}</span>Your own groups</h2>
+        <p>Assign each candidate to a group from information they shared with you (for example, self-reported in an application form). The screener never infers personal attributes.</p></div>
+        <button class="btn btn-sm btn-ghost" data-act="clear-groups" ${Object.keys(S.groups).length ? '' : 'disabled'}>${I('trash', 14)} Clear all groups</button></div>
+        <div class="card-body"><datalist id="group-names">${[...new Set(Object.values(S.groups))].map(g => `<option value="${esc(g)}">`).join('')}</datalist>
+          <div class="grp-list">${S.screen.candidates.map(c => `<label class="grp-row">${avatar(c)}<span>${esc(candName(c))}</span>
+            <input type="text" list="group-names" data-group="${esc(c.file)}" value="${esc(S.groups[c.file] || '')}" placeholder="Group name" maxlength="40"></label>`).join('')}</div></div></section>` : ''}
+      <div class="note" style="margin-top:16px">${I('info')}<div>This is an internal check, not a legal audit. Laws such as New York City's Local Law 144 require an independent bias audit of automated hiring tools using real demographic data.</div></div>
+    </div>`;
+  }
+
+  /* ---------------------------------------------------------------- evidence (explain this score) */
+  function evidenceTab(c) {
+    const W = curWeights(), act = c.parts.filter(p => p.value != null);
+    const den = act.reduce((a, p) => a + (+W[p.key] || 0), 0) || 1;
+    const rows = act.map(p => { const max = (+W[p.key] || 0) / den * 100; return { ...p, max, pts: max * p.value / 100 }; });
+    const raw = rows.reduce((a, r) => a + r.pts, 0), pen = c.verdict_inputs.penalty;
+    const ev = c.evidence, on = S.hl;
+    let txt = ev.text, html = '', pos = 0;
+    ev.highlights.forEach(h => {
+      if (h.start < pos) return;
+      html += esc(txt.slice(pos, h.start));
+      const frag = esc(txt.slice(h.start, h.end));
+      html += on.has(h.kind) ? `<mark class="hl ${h.kind}" data-tip="${esc(h.label)}">${frag}</mark>` : frag;
+      pos = h.end;
+    });
+    html += esc(txt.slice(pos));
+    if (S.blind && c.name_guess) html = html.split(esc(c.name_guess)).join(`<mark class="hl other">${esc(c.label)}</mark>`);
+    const kinds = [['shown', 'Skill shown in work'], ['listed', 'Skill only listed'], ['related', 'Described, not named'], ['metric', 'Measurable result'], ['other', 'Other skill']];
+    return `
+      <div class="sec-title" style="margin-top:4px">Where the ${Math.round(c.score)} points come from</div>
+      <div class="comp" role="img" aria-label="Score composition">${rows.filter(r => r.pts > 0.2).map(r => `<i style="flex:${r.pts};background:${PART_C[r.key]}" data-tip="${esc(r.label)}: ${r.pts.toFixed(1)} of ${r.max.toFixed(1)} points"></i>`).join('')}<i class="rest" style="flex:${Math.max(0, 100 - raw)}" data-tip="Points not earned: ${(100 - raw).toFixed(1)}"></i></div>
+      <div class="pts">${rows.map(r => `<div class="pt-row" style="--c:${PART_C[r.key]}"><span class="pt-name"><i></i>${esc(r.label)} ${tip(PART_TIPS[r.key] || '')}</span>
+        <span class="pt-bar"><i style="width:${r.value}%"></i></span><span class="pt-val"><b>${r.pts.toFixed(1)}</b> / ${r.max.toFixed(1)}</span></div>`).join('')}
+        ${pen ? `<div class="pt-row pen"><span class="pt-name">${I('anomaly', 13)} Integrity penalty</span><span></span><span class="pt-val"><b>−${pen}</b></span></div>` : ''}
+        <div class="pt-row total"><span class="pt-name">Score</span><span></span><span class="pt-val"><b>${Math.round(c.score)}</b> / 100</span></div></div>
+      ${ev.pairs.length ? `<div class="sec-title">Closest matches by meaning</div>
+        <div class="pairs">${ev.pairs.map(p => `<div class="pair"><div class="pj"><span class="tiny muted">Job asks</span>${esc(p.job)}</div>
+          <div class="pr"><span class="tiny muted">Resume says</span>${esc(p.resume)}</div><span class="sim" style="--s:${Math.round(p.sim * 100)}%">${Math.round(p.sim * 100)}%</span></div>`).join('')}</div>` : ''}
+      <div class="sec-title">The resume, highlighted</div>
+      <div class="hl-legend">${kinds.map(([k, l]) => `<button class="hl-key ${k} ${on.has(k) ? 'on' : ''}" data-act="hl" data-k="${k}" aria-pressed="${on.has(k)}"><i></i>${l}</button>`).join('')}</div>
+      <pre class="resume-text">${html}</pre>
+      <p class="tiny muted">Emails and phone numbers are masked. Lines copied from the job description were removed before scoring.</p>`;
+  }
+
+  /* ---------------------------------------------------------------- notes, stage, tags */
+  function notesTab(c) {
+    const p = pipeOf(c);
+    return `
+      <div class="sec-title" style="margin-top:4px">Stage</div>
+      <div class="stage-seg">${PSTAGES.map(st => `<button class="${p.stage === st ? 'on' : ''}" style="--c:${STAGE_C[st]}" data-act="set-stage" data-s="${esc(st)}">${esc(st)}</button>`).join('')}</div>
+      <div class="sec-title">Tags</div>
+      <div class="chips">${p.tags.map((t, i) => `<span class="chip tag">${esc(t)}<button class="chip-x" data-act="rm-tag" data-i="${i}" aria-label="Remove tag ${esc(t)}">${I('x', 11)}</button></span>`).join('') || '<span class="small muted">No tags yet.</span>'}</div>
+      <div class="row" style="margin-top:10px;flex-wrap:nowrap"><input type="text" id="tag-in" placeholder="Add a tag and press Enter" maxlength="30">
+        <button class="btn btn-sm" data-act="add-tag">${I('plus', 14)} Add</button></div>
+      <div class="chips" style="margin-top:8px">${TAG_IDEAS.filter(t => !p.tags.includes(t)).slice(0, 5).map(t => `<button class="chip outline" data-act="add-tag" data-t="${esc(t)}">${I('plus', 11)}${esc(t)}</button>`).join('')}</div>
+      <div class="sec-title">Notes</div>
+      <textarea id="note-in" placeholder="Write a note about this candidate…" style="min-height:90px"></textarea>
+      <div class="row" style="justify-content:space-between;margin-top:8px"><span class="tiny muted">${I('lock', 12)} Kept in this browser tab only.</span>
+        <button class="btn btn-sm btn-primary" data-act="add-note">${I('plus', 14)} Add note</button></div>
+      <div class="notes">${p.notes.map((n, i) => `<div class="note-item"><p>${esc(n.text)}</p><div class="row" style="justify-content:space-between"><span class="tiny muted">${ago(n.at)}</span>
+        <button class="icon-btn danger" data-act="rm-note" data-i="${i}" aria-label="Delete note">${I('trash', 14)}</button></div></div>`).join('')}</div>
+      ${p.notes.length > 1 ? `<button class="btn btn-sm btn-ghost" style="margin-top:8px" data-act="clear-notes">${I('trash', 14)} Delete all notes</button>` : ''}
+      <div class="danger-zone"><div><b>Remove from this screening</b><p class="small muted">Takes the candidate out of the board, totals and export. You can undo straight after.</p></div>
+        <button class="btn btn-sm btn-danger-ghost" data-act="remove-cand" data-id="${c.id}">${I('trash', 14)} Remove</button></div>`;
+  }
+
+  /* ---------------------------------------------------------------- KPI details */
+  const kpiAttrs = (k, label) => `data-act="kpi" data-k="${k}" role="button" tabindex="0" aria-label="${esc(label)}: show details"`;
+  function detailModal() {
+    const { k } = S.detail, jobs = S.jobs || [], open = jobs.filter(j => j.status === 'Open');
+    const d = S.screen, ev = S.model?.evaluation;
+    const listRow = (left, right, pctv, c) => `<div class="dl-row"><span class="dl-l">${left}</span><span class="dl-bar" style="--c:${c || 'var(--iris)'}"><i style="width:${Math.max(pctv, 1)}%"></i></span><span class="dl-r">${right}</span></div>`;
+    const candRow = c => `<button class="dl-cand" data-act="open-cand" data-id="${c.id}">${avatar(c)}<span class="dl-l"><b>${esc(candName(c))}</b><span class="tiny muted">${esc(c.file)}</span></span>${pill(c.verdict.key)}<b class="dl-s">${Math.round(c.score)}</b></button>`;
+    let title = '', icon = 'info', c = 'var(--iris)', value = '', body = '', note = '';
+    const jobRows = (fn, max, color) => jobs.length ? jobs.map(j => listRow(`<b>${esc(j.title)}</b><span class="tiny muted">${esc(j.status)}</span>`, fn(j), max ? fn(j, true) / max * 100 : 0, color)).join('') : '<p class="muted">No jobs yet.</p>';
+    if (k === 'open') { title = 'Open roles'; icon = 'briefcase'; c = 'var(--c-blue)'; value = open.length;
+      note = 'Roles marked Open in the job library. On hold and Closed roles are left out.';
+      body = open.map(j => `<div class="dl-job"><div><b>${esc(j.title)}</b><div class="tiny muted">${[j.department, j.location, j.employment_type].filter(Boolean).map(esc).join(' · ')}</div></div>
+        <span class="small">${j.openings} opening${j.openings > 1 ? 's' : ''}</span><button class="btn btn-sm" data-act="screen-job" data-id="${j.id}">${I('users', 14)} Screen</button></div>`).join('') || '<p class="muted">No open roles.</p>'; }
+    if (k === 'positions') { title = 'Positions to fill'; icon = 'users'; c = 'var(--c-violet)'; value = open.reduce((a, j) => a + j.openings, 0);
+      const mx = Math.max(1, ...open.map(j => j.openings)); note = 'Headcount still to hire across open roles.';
+      body = open.map(j => listRow(`<b>${esc(j.title)}</b>`, `${j.openings}`, j.openings / mx * 100, c)).join('') || '<p class="muted">No open roles.</p>'; }
+    if (k === 'screened') { title = 'Resumes screened'; icon = 'fileText'; c = 'var(--c-teal)'; value = jobs.reduce((a, j) => a + (j.candidates_screened || 0), 0);
+      const mx = Math.max(1, ...jobs.map(j => j.candidates_screened || 0)); note = 'All-time counts per saved job. Only the numbers are kept, never the resumes.';
+      body = jobRows((j, raw) => raw ? (j.candidates_screened || 0) : `${j.candidates_screened || 0} in ${j.screenings || 0} run${j.screenings === 1 ? '' : 's'}`, mx, c); }
+    if (k === 'rate') { const sc = jobs.reduce((a, j) => a + (j.candidates_screened || 0), 0), sh = jobs.reduce((a, j) => a + (j.shortlisted || 0), 0);
+      title = 'Shortlist rate'; icon = 'star'; c = 'var(--c-pink)'; value = `${pct(sh, sc)}%`; note = 'Share of screened resumes that reached Strong shortlist or Shortlist.';
+      body = jobs.filter(j => j.candidates_screened).map(j => listRow(`<b>${esc(j.title)}</b>`, `${pct(j.shortlisted, j.candidates_screened)}% <span class="tiny muted">(${j.shortlisted}/${j.candidates_screened})</span>`, pct(j.shortlisted, j.candidates_screened), c)).join('') || '<p class="muted">Screen candidates against a saved job to see rates here.</p>'; }
+    if (d && (k in VERD || ['pool', 'short', 'flags', 'avg', 'gaps'].includes(k))) {
+      const cs = d.candidates;
+      if (k in VERD) { title = VERD[k].label; icon = VERD[k].icon; c = VERD[k].m; const l = cs.filter(x => x.verdict.key === k); value = l.length; note = NEXT[k]; body = l.map(candRow).join('') || '<p class="muted">Nobody here.</p>'; }
+      if (k === 'pool') { title = 'Candidates screened'; icon = 'users'; value = cs.length; note = 'Everyone in this screening, by rank.'; body = cs.map(candRow).join(''); }
+      if (k === 'short') { title = 'On the shortlist'; icon = 'star'; c = 'var(--c-green)'; const l = cs.filter(isShort); value = `${l.length} (${pct(l.length, cs.length)}%)`; note = 'Strong shortlist and Shortlist together.'; body = l.map(candRow).join('') || '<p class="muted">Nobody reached the shortlist.</p>'; }
+      if (k === 'flags') { title = 'Integrity flags'; icon = 'anomaly'; c = 'var(--c-orange)'; const l = flagged(); value = l.length; note = 'Copied job text, crammed bullets or inflated years. Flagged resumes stop at Interview to verify.';
+        body = l.map(x => `${candRow(x)}<div class="dl-flags">${x.integrity.flags.map(esc).join('<br>')}</div>`).join('') || '<p class="muted">No integrity flags in this pool.</p>'; }
+      if (k === 'avg') { title = 'Scores in this pool'; icon = 'gauge'; c = 'var(--c-violet)'; value = Math.round(cs.reduce((a, x) => a + x.score, 0) / (cs.length || 1)); note = 'Average score. Each bar is one candidate.';
+        body = cs.map(x => `<button class="dl-cand" data-act="open-cand" data-id="${x.id}">${avatar(x)}<span class="dl-l"><b>${esc(candName(x))}</b></span><span class="dl-bar" style="--c:${VERD[x.verdict.key].m}"><i style="width:${x.score}%"></i></span><b class="dl-s">${Math.round(x.score)}</b></button>`).join(''); }
+      if (k === 'gaps') { title = 'Must-haves nobody has'; icon = 'target'; c = 'var(--c-pink)'; const g = d.skill_coverage.filter(s => s.have === 0); value = g.length;
+        note = 'If nobody in the pool shows or lists a requirement, it may be unrealistic for this market, or worth training for.';
+        body = d.skill_coverage.slice().sort((a, b) => a.have - b.have).map(s => listRow(`<b>${esc(s.skill)}</b>`, `${s.have}/${s.of}`, pct(s.have, s.of), s.have ? 'var(--c-teal)' : 'var(--red)')).join(''); }
+    }
+    if (ev && k.startsWith('m-')) {
+      const prev = S.model.history.length > 1 ? S.model.history[S.model.history.length - 2] : null;
+      const L = { reject: 'Not a fit', maybe: 'Interview to verify', shortlist: 'Shortlist' };
+      const M = {
+        'm-accuracy': ['Verdict accuracy', 'check', 'var(--c-blue)', `${(ev.accuracy * 100).toFixed(1)}%`, 'Share of labelled pairs where the engine’s verdict class matches the human label (shortlist, maybe or reject).',
+          ev.labels.map((t, i) => listRow(`<b>${L[t]}</b><span class="tiny muted">human label</span>`, `${ev.confusion[i][i]} of ${ev.confusion[i].reduce((a, b) => a + b, 0)} agreed`, pct(ev.confusion[i][i], ev.confusion[i].reduce((a, b) => a + b, 0)), 'var(--c-blue)')).join('')],
+        'm-kappa': ['Weighted kappa', 'scale', 'var(--c-iris)', ev.kappa.toFixed(2), 'Agreement after removing what chance alone would give. A one-step miss (maybe vs reject) costs half a two-step miss. 0.61–0.80 is substantial, above 0.80 near-perfect.',
+          `<div class="kscale">${[[0, 'Poor'], [0.2, 'Fair'], [0.4, 'Moderate'], [0.6, 'Substantial'], [0.8, 'Near-perfect']].map(([v, l]) => `<span class="${ev.kappa >= v && ev.kappa < v + 0.2 + (v === 0.8 ? 0.21 : 0) ? 'on' : ''}">${l}<em>${v.toFixed(1)}+</em></span>`).join('')}</div>`],
+        'm-spearman': ['Spearman rho', 'trendUp', 'var(--c-violet)', ev.spearman.toFixed(2), 'How well the 0–100 score orders people the way the labels do. 1.0 would mean every shortlist outscores every maybe, and every maybe outscores every reject.', ''],
+        'm-p3': ['Precision at 3', 'target', 'var(--c-teal)', `${Math.round(ev.p_at_3 * 100)}%`, 'For each job, the share of the top three candidates a person labelled shortlist or maybe. This is what a recruiter feels when opening the board.', ''],
+        'm-stuffers': ['Stuffers caught', 'shield', 'var(--c-orange)', `${ev.stuffers_caught}/${ev.stuffers}`, 'Resumes that paste the job description or cram every tool into one line, kept off the shortlist.',
+          (ev.disagreements || []).filter(x => /stuffer/.test(x.note)).map(x => `<div class="dl-job"><b>${esc(x.resume)}</b><span class="small">${esc(x.verdict)}</span></div>`).join('') || '<p class="small muted">Every stuffer in the set stopped at Interview to verify or below.</p>'],
+        'm-fr': ['Good candidates rejected', 'alert', 'var(--c-pink)', `${ev.false_rejections}/${ev.good}`, 'People a human would at least interview who got Not a fit. For a screener this is the costliest error, so it is tracked on its own.',
+          (ev.disagreements || []).filter(x => x.label !== 'reject' && x.verdict === 'Not a fit').map(x => `<div class="dl-job"><div><b>${esc(x.resume)}</b><div class="tiny muted">${esc(ev.jobs[x.job] || x.job)} · ${esc(x.note)}</div></div><span class="small">score ${x.score}</span></div>`).join('')],
+      };
+      [title, icon, c, value, note, body] = M[k];
+      if (prev && k in { 'm-accuracy': 1, 'm-kappa': 1, 'm-spearman': 1, 'm-p3': 1 }) {
+        const key = { 'm-accuracy': 'accuracy', 'm-kappa': 'kappa', 'm-spearman': 'spearman', 'm-p3': 'p_at_3' }[k];
+        body += `<div class="sec-title">By version</div>` + S.model.history.map(h => listRow(`<b>v${esc(h.version)}</b><span class="tiny muted">${esc(h.note || '')}</span>`, key === 'accuracy' || key === 'p_at_3' ? `${Math.round(h[key] * 1000) / 10}%` : h[key].toFixed(2), h[key] * 100, c)).join('');
+      }
+    }
+    if (!title) return '';
+    return `<div class="modal-scrim" data-act="close-detail"><div class="modal detail" role="dialog" aria-modal="true" aria-label="${esc(title)}" style="--c:${c}">
+      <div class="detail-head"><span class="hic" style="--c:${c}">${I(icon, 18)}</span><div><span class="small muted">${esc(title)}</span><b class="detail-v">${value}</b></div>
+        <button class="icon-btn" data-act="close-detail" aria-label="Close">${I('x')}</button></div>
+      ${note ? `<p class="detail-note">${esc(note)}</p>` : ''}
+      <div class="detail-body">${body}</div></div></div>`;
+  }
+
+  /* ---------------------------------------------------------------- client-side export */
+  function exportCsv() {
+    const d = S.screen, q = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const head = ['rank', 'candidate', 'file', 'score', 'verdict', 'stage', 'tags', 'notes', 'must_haves', 'years', 'missing_must_haves', 'top_risk', 'next_step'];
+    const rows = d.candidates.map(c => { const p = pipeOf(c); return [c.rank, candName(c), c.file, c.score, c.verdict.label, p.stage, p.tags.join('; '), p.notes.map(n => n.text).join(' | '),
+      `${c.summary.must_matched}/${d.job.must_units.length}`, c.summary.years ?? '', c.skills.filter(s => s.importance === 'must' && s.status === 'missing').map(s => s.skill).join('; '),
+      c.risks[0] || '', c.verdict.next]; });
+    const csv = [head, ...rows].map(r => r.map(q).join(',')).join('\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+    Object.assign(document.createElement('a'), { href: url, download: 'shortlist.csv' }).click();
+    URL.revokeObjectURL(url);
+    toast(S.weights ? 'Exported with your custom weights' : 'Shortlist exported');
+  }
+
   /* ---------------------------------------------------------------- actions */
   const wait = ms => new Promise(r => setTimeout(r, ms));
   async function runScreen() {
@@ -1073,7 +1446,8 @@ const App = (() => {
       S.screen = await call;
       if (S.run) { S.run.done = true; updateRun(); await wait(280); }
       if (S.screen.job_id) loadJobs().catch(() => { });
-      S.compare.clear(); S.drawer = null; S.run = null; S.view = S.view === 'insights' ? 'board' : S.view; S.dealt = !reduced;
+      S.compare.clear(); S.drawer = null; S.run = null; S.view = ['insights', 'fairness'].includes(S.view) ? 'board' : S.view; S.dealt = !reduced;
+      recompute();
       S.activity.unshift({ title: (S.job.id && jobById(S.job.id)?.title) || S.screen.job.title || title, n: S.screen.candidates.length, counts: S.screen.counts,
         flags: S.screen.candidates.filter(c => c.integrity?.suspicious).length, at: new Date().toISOString() });
       S.activity = S.activity.slice(0, 6);
@@ -1162,15 +1536,11 @@ const App = (() => {
         if (a === 'upload-multi') { if (ev.target.closest('a')) return; pendingTarget = 'multi'; return $('file-multi').click(); }
         if (a === 'upload-job') { pendingTarget = 'job'; return $('file-one').click(); }
         if (a === 'upload-imp') { pendingTarget = 'imp'; return $('file-one').click(); }
-        if (a === 'rm-resume') { S.resumes.splice(+t.dataset.i, 1); return render(false); }
+        if (a === 'rm-resume') { const i = +t.dataset.i, [r] = S.resumes.splice(i, 1); render(false);
+          return toast(`${r.name} removed`, false, { label: 'Undo', run: () => { S.resumes.splice(i, 0, r); render(false); } }); }
         if (a === 'run-screen') return runScreen();
         if (a === 'edit-inputs') { S.screen = null; S.drawer = null; S.compare.clear(); window.scrollTo(0, 0); return render(); }
-        if (a === 'export') {
-          const csv = await api('/api/screen/export', { job: S.job.text, resumes: S.resumes.map(r => ({ name: r.name, text: r.text })) });
-          const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
-          const link = Object.assign(document.createElement('a'), { href: url, download: 'shortlist.csv' });
-          link.click(); URL.revokeObjectURL(url); return toast('Shortlist exported');
-        }
+        if (a === 'export') return exportCsv();
         if (a === 'view') return setView(t.dataset.v);
         if (a === 'palette') return openPalette();
         if (a === 'pal-run') return runPalette(+t.dataset.i);
@@ -1196,6 +1566,38 @@ const App = (() => {
         if (a === 'run-improve') { S.imp.assume.clear(); return runImprove(); }
         if (a === 'imp-reset') { S.imp.result = null; S.imp.base = null; S.imp.assume.clear(); window.scrollTo(0, 0); return render(); }
         if (a === 'assume') { const s = t.dataset.s; S.imp.assume.has(s) ? S.imp.assume.delete(s) : S.imp.assume.add(s); return runImprove(true); }
+        // ---- v2.3 interactions
+        const cur = () => S.screen?.candidates.find(x => x.id === S.drawer);
+        const refreshMain = () => { if ($('results') && ['board', 'table', 'pipeline'].includes(S.view)) $('results').innerHTML = resultsView(); };
+        if (a === 'kpi') { S.detail = { k: t.dataset.k }; return renderOverlays(); }
+        if (a === 'close-detail') { if (ev.target === t || t.classList.contains('icon-btn')) { S.detail = null; renderOverlays(); } return; }
+        if (a === 'open-cand') { S.detail = null; S.drawer = t.dataset.id; S.tab = 'overview'; if (route() !== 'screen') location.hash = '#/screen'; return renderOverlays(); }
+        if (a === 'explain') { ev.stopPropagation(); S.drawer = t.dataset.id; S.tab = 'evidence'; return renderOverlays(); }
+        if (a === 'tune') { S.tune = !S.tune; refreshResults(); return renderOverlays(); }
+        if (a === 'close-tune') { S.tune = false; refreshResults(); return renderOverlays(); }
+        if (a === 'preset') { S.weights = { ...PRESETS[t.dataset.p] }; recompute(); refreshResults(); renderOverlays(); return toast(`${t.dataset.p} weights applied`); }
+        if (a === 'reset-weights') { S.weights = null; recompute(); refreshResults(); renderOverlays(); return toast('Back to the model weights'); }
+        if (a === 'set-stage') return setStage(S.drawer, t.dataset.s);
+        if (a === 'add-tag') { const c = cur(); if (!c) return; const v = (t.dataset.t || $('tag-in')?.value || '').trim(); if (!v) return;
+          const p = pipeOf(c); if (!p.tags.includes(v)) p.tags.push(v); renderOverlays(); refreshMain(); setTimeout(() => $('tag-in')?.focus(), 0); return; }
+        if (a === 'rm-tag') { const p = pipeOf(cur()), i = +t.dataset.i, [x] = p.tags.splice(i, 1); renderOverlays(); refreshMain();
+          return toast(`Tag “${x}” removed`, false, { label: 'Undo', run: () => { p.tags.splice(i, 0, x); renderOverlays(); refreshMain(); } }); }
+        if (a === 'add-note') { const v = $('note-in')?.value.trim(); if (!v) return toast('Write the note first', true);
+          pipeOf(cur()).notes.unshift({ text: v.slice(0, 2000), at: new Date().toISOString() }); renderOverlays(); refreshMain(); return toast('Note added'); }
+        if (a === 'rm-note') { const p = pipeOf(cur()), i = +t.dataset.i, [n] = p.notes.splice(i, 1); renderOverlays(); refreshMain();
+          return toast('Note deleted', false, { label: 'Undo', run: () => { p.notes.splice(i, 0, n); renderOverlays(); refreshMain(); } }); }
+        if (a === 'clear-notes') { const p = pipeOf(cur()), old = p.notes; p.notes = []; renderOverlays(); refreshMain();
+          return toast(`${old.length} notes deleted`, false, { label: 'Undo', run: () => { p.notes = old; renderOverlays(); refreshMain(); } }); }
+        if (a === 'remove-cand') return removeCandidate(t.dataset.id);
+        if (a === 'hl') { const k = t.dataset.k; S.hl.has(k) ? S.hl.delete(k) : S.hl.add(k); return renderOverlays(); }
+        if (a === 'clear-groups') { const old = S.groups; S.groups = {}; $('results').innerHTML = resultsView();
+          return toast('Groups cleared', false, { label: 'Undo', run: () => { S.groups = old; $('results').innerHTML = resultsView(); } }); }
+        if (a === 'rm-activity') { const i = +t.dataset.i, [x] = S.activity.splice(i, 1); render(false);
+          return toast('Removed from the session list', false, { label: 'Undo', run: () => { S.activity.splice(i, 0, x); render(false); } }); }
+        if (a === 'clear-activity') { const old = S.activity; S.activity = []; render(false);
+          return toast('Session list cleared', false, { label: 'Undo', run: () => { S.activity = old; render(false); } }); }
+        if (a === 'rm-all-resumes') { const old = S.resumes; S.resumes = []; render(false);
+          return toast(`${old.length} resumes removed`, false, { label: 'Undo', run: () => { S.resumes = old; render(false); } }); }
         return;
       }
       if (card && !ev.target.closest('.cmp-check')) { S.drawer = card.dataset.cand; S.tab = 'overview'; renderOverlays(); }
@@ -1216,11 +1618,15 @@ const App = (() => {
         return;
       }
       if (S.shortcuts && ev.key === 'Escape') { S.shortcuts = false; return renderOverlays(); }
+      if (S.detail && ev.key === 'Escape') { S.detail = null; return renderOverlays(); }
+      if (ev.key === 'Enter' && ev.target.id === 'tag-in') { ev.preventDefault(); return document.querySelector('[data-act="add-tag"]:not([data-t])')?.click(); }
+      if ((ev.key === 'Enter' || ev.key === ' ') && ev.target.matches?.('[data-act="kpi"]')) { ev.preventDefault(); return ev.target.click(); }
+      if (S.tune && ev.key === 'Escape' && !S.drawer) { S.tune = false; refreshResults(); return renderOverlays(); }
       if (S.run) return;
       if (!typing && !ev.metaKey && !ev.ctrlKey && !ev.altKey && !S.editor && !S.confirm) {
         if (ev.key === '?') { S.shortcuts = !S.shortcuts; return renderOverlays(); }
         if (S.drawer && (ev.key === 'ArrowLeft' || ev.key === 'ArrowRight')) { ev.preventDefault(); return stepDrawer(ev.key === 'ArrowRight' ? 1 : -1); }
-        if (route() === 'screen' && S.screen && !S.drawer && ['1', '2', '3'].includes(ev.key)) return setView(['board', 'table', 'insights'][+ev.key - 1]);
+        if (route() === 'screen' && S.screen && !S.drawer && /^[1-5]$/.test(ev.key)) return setView(RTABS[+ev.key - 1][0]);
       }
       if (ev.key === 'Escape' && (S.confirm || S.editor)) { if (S.confirm) S.confirm = null; else S.editor = null; return renderOverlays(); }
       if (ev.key === 'Escape') { if (S.compareOpen) S.compareOpen = false; else if (S.drawer) S.drawer = null; else return; renderOverlays(); }
@@ -1245,6 +1651,7 @@ const App = (() => {
       if (ev.target.id === 'imp-resume') { S.imp.resume.text = ev.target.value; refreshCta(); }
       if (ev.target.id === 'imp-job') { S.imp.job = ev.target.value; S.imp.jobId = null; const p = $('imp-job-pick'); if (p) p.value = ''; refreshCta(); }
       if (ev.target.id === 'q') { S.q = ev.target.value; $('results').innerHTML = resultsView(); }
+      if (ev.target.dataset?.w) return setWeight(ev.target.dataset.w, +ev.target.value);
       if (ev.target.id === 'pal-q') { S.palette.q = ev.target.value; S.palette.i = 0; $('pal-list').innerHTML = paletteList(); }
     });
     document.addEventListener('change', ev => {
@@ -1265,10 +1672,19 @@ const App = (() => {
           .catch(e => { toast(e.message, true); render(false); });
         return;
       }
+      if (ev.target.dataset?.fair) { S.fair[ev.target.dataset.fair] = ev.target.value; $('results').innerHTML = resultsView(); return; }
+      if (ev.target.dataset?.group !== undefined) { const v = ev.target.value.trim(); if (v) S.groups[ev.target.dataset.group] = v; else delete S.groups[ev.target.dataset.group];
+        $('results').innerHTML = resultsView(); return; }
       if (ev.target.id === 'blind') { S.blind = ev.target.checked; store.set('ri2-blind', S.blind ? 'on' : 'off'); render(false); }
       if (ev.target.id === 'file-multi' || ev.target.id === 'file-one') { uploadFiles([...ev.target.files], pendingTarget); ev.target.value = ''; }
     });
 
+    document.addEventListener('dragstart', ev => { const c = ev.target.closest?.('.pcard'); if (!c) return;
+      ev.dataTransfer.setData('text/plain', c.dataset.cand); ev.dataTransfer.effectAllowed = 'move'; c.classList.add('dragging'); });
+    document.addEventListener('dragend', ev => { ev.target.closest?.('.pcard')?.classList.remove('dragging'); document.querySelectorAll('.pcol.over').forEach(n => n.classList.remove('over')); });
+    document.addEventListener('dragover', ev => { const col = ev.target.closest?.('.pcol'); if (col) { ev.preventDefault(); document.querySelectorAll('.pcol.over').forEach(n => n !== col && n.classList.remove('over')); col.classList.add('over'); } });
+    document.addEventListener('drop', ev => { const col = ev.target.closest?.('.pcol'); if (!col) return; ev.preventDefault(); col.classList.remove('over');
+      const id = ev.dataTransfer.getData('text/plain'); if (id) setStage(id, col.dataset.stage); });
     document.addEventListener('dragover', ev => { const d = ev.target.closest('.drop'); if (d) { ev.preventDefault(); d.classList.add('over'); } });
     document.addEventListener('dragleave', ev => { const d = ev.target.closest('.drop'); if (d) d.classList.remove('over'); });
     document.addEventListener('drop', ev => { const d = ev.target.closest('.drop'); if (!d) return; ev.preventDefault(); d.classList.remove('over'); uploadFiles([...ev.dataTransfer.files], 'multi'); });
@@ -1287,9 +1703,9 @@ const App = (() => {
 
   function setView(v) {
     if (S.view === v) return;
-    S.view = v; store.set('ri2-view', v === 'insights' ? 'board' : v);
+    S.view = v; store.set('ri2-view', ['board', 'table', 'pipeline'].includes(v) ? v : 'board');
     document.querySelectorAll('.tabseg button').forEach(b => { const on = b.dataset.v === v; b.classList.toggle('on', on); b.setAttribute('aria-selected', on); });
-    const srch = document.querySelector('.toolbar .search'); if (srch) srch.hidden = v === 'insights';
+    const srch = document.querySelector('.toolbar .search'); if (srch) srch.hidden = ['insights', 'fairness'].includes(v);
     const r = $('results'); r.innerHTML = resultsView(); r.classList.remove('swap'); void r.offsetWidth; r.classList.add('swap');
     if (!reduced) r.querySelectorAll('[data-count]').forEach(n => { delete n.dataset.done; });
     animateCounts(r);

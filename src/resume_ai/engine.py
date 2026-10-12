@@ -18,6 +18,8 @@ worked out by re-scoring the resume with that fix applied.
 """
 from __future__ import annotations
 
+import json
+import os
 import re
 from dataclasses import dataclass, field, replace
 from functools import lru_cache
@@ -26,16 +28,37 @@ from pathlib import Path
 from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS, TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
-from . import integrity
+from . import integrity, semantic
 from . import jd as jdmod
 from .parsing import Profile, mask_pii, profile
-from .skills import CATEGORY, RELATED_CREDIT, by_category, find_related, find_skills
+from .skills import (CATEGORY, RELATED_CREDIT, by_category, find_related, find_skills,  # noqa: F401
+                     skill_query, skill_spans)
 
-WEIGHTS = {"must": 38, "nice": 10, "experience": 14, "education": 5,
-           "similarity": 13, "evidence": 12, "quality": 8}
+# Hand-set starting weights. eval/train.py learns weights from the labelled set
+# and writes weights.json next to this file; when present, those are used.
+HAND_WEIGHTS = {"must": 34, "nice": 9, "experience": 14, "education": 5,
+                "similarity": 8, "semantic": 12, "evidence": 11, "quality": 7}
+WEIGHTS_FILE = Path(__file__).with_name("weights.json")
 PART_LABELS = {"must": "Must-have skills", "nice": "Nice-to-have skills", "experience": "Experience",
-               "education": "Education", "similarity": "Overall relevance", "evidence": "Evidence of impact",
-               "quality": "Resume quality"}
+               "education": "Education", "similarity": "Keyword relevance", "semantic": "Meaning match",
+               "evidence": "Evidence of impact", "quality": "Resume quality"}
+SEM_RELATED = 0.55     # similarity at which a resume line counts as describing a missing skill
+
+
+def _load_weights() -> tuple[dict[str, float], str]:
+    if os.environ.get("WEIGHTS", "learned") != "hand" and WEIGHTS_FILE.exists():
+        try:
+            data = json.loads(WEIGHTS_FILE.read_text(encoding="utf-8"))
+            w = data["weights"]
+            # Only use learned weights that beat the hand-set ones in cross-validation.
+            if data.get("adopted") and set(w) == set(HAND_WEIGHTS):
+                return {k: float(v) for k, v in w.items()}, "learned"
+        except (ValueError, KeyError):
+            pass
+    return dict(HAND_WEIGHTS), "hand"
+
+
+WEIGHTS, WEIGHTS_SOURCE = _load_weights()
 LISTED_ONLY_CREDIT = 0.7
 
 ACTION_VERBS = {
@@ -86,6 +109,8 @@ class Features:
     has_phone: bool
     similarity: float
     extra: set[str] = field(default_factory=set)      # what-if: skills the candidate confirms they have
+    semantic: float | None = None                     # mean best similarity of job lines to resume lines
+    work_text: str = ""
     related: dict[str, str] = field(default_factory=dict)  # skill -> phrase describing it without naming it
 
 
@@ -114,7 +139,30 @@ def features_from(p: Profile, similarity: float, crammed: list[str] | None = Non
                     n_bullets=len(p.bullets), n_quant=len(quant), n_action=len(action),
                     weak_bullets=weak, sections=set(p.sections), word_count=p.word_count,
                     has_email=p.has_email, has_phone=p.has_phone, similarity=similarity,
-                    related=related)
+                    related=related, work_text=work_text)
+
+
+def add_semantic(f: Features, spec: jdmod.JobSpec) -> list[dict]:
+    """Meaning-based evidence, when the model is available.
+
+    Sets f.semantic (how well resume lines cover the job's lines) and adds
+    skills the resume describes without naming to f.related. Returns the
+    job-line to resume-line pairs for the explanation view.
+    """
+    if not semantic.available():
+        return []
+    lines = semantic.units(f.work_text)
+    if not lines:
+        f.semantic = 0.0
+        return []
+    f.semantic, pairs = semantic.coverage(semantic.units(spec.text, limit=30), lines)
+    wanted = [s for s in dict.fromkeys(spec.required + spec.preferred)
+              if s not in f.found and s not in f.related]
+    if wanted:
+        for skill, (line, sim) in semantic.best_evidence({s: skill_query(s) for s in wanted}, lines).items():
+            if sim >= SEM_RELATED:
+                f.related[skill] = line if len(line) <= 90 else line[:87].rstrip() + "…"
+    return sorted(pairs, key=lambda p: -p["sim"])
 
 
 REFERENCE_DIR = Path(__file__).resolve().parents[2] / "samples"
@@ -196,6 +244,7 @@ def score_parts(f: Features, spec: jdmod.JobSpec) -> dict[str, float]:
         parts["education"] = None
 
     parts["similarity"] = max(0.0, min(1.0, (f.similarity - 0.03) / 0.27))
+    parts["semantic"] = None if f.semantic is None else max(0.0, min(1.0, (f.semantic - 0.20) / 0.40))
 
     jd_skills = set(spec.required) | set(spec.preferred)
     relevant = [s for s in jd_skills if s in f.found or s in f.extra]
@@ -210,8 +259,8 @@ def score_parts(f: Features, spec: jdmod.JobSpec) -> dict[str, float]:
     return parts
 
 
-def overall(parts: dict[str, float]) -> float:
-    active = {k: w for k, w in WEIGHTS.items() if parts.get(k) is not None}
+def overall(parts: dict[str, float], weights: dict[str, float] | None = None) -> float:
+    active = {k: w for k, w in (weights or WEIGHTS).items() if parts.get(k) is not None}
     total_w = sum(active.values())
     return round(sum(parts[k] * w for k, w in active.items()) / total_w * 100, 1)
 
@@ -501,15 +550,64 @@ def _suggestions(spec, f, parts, table, p, base_score) -> list[dict]:
     return out
 
 
-def analyze(resume_text: str, jd_text: str, *, assume_skills: list[str] | None = None,
-            spec: jdmod.JobSpec | None = None) -> dict:
-    spec = spec or jdmod.parse(jd_text)
+def prepare(resume_text: str, spec: jdmod.JobSpec):
+    """Everything about a resume-job pair that does not depend on the weights."""
     jd_skills = set(spec.required) | set(spec.preferred)
     copied = integrity.copied_lines(resume_text, spec.text)
     clean_text = integrity.strip_lines(resume_text, copied) if copied else resume_text
     p = profile(clean_text)
     integ = integrity.check(copied, p.bullets, jd_skills, p.stated_years, p.dated_years)
     f = features_from(p, similarity(p.text, spec.text), integ.crammed_bullets)
+    pairs = add_semantic(f, spec)
+    return p, f, integ, pairs
+
+
+def verdict_inputs(parts: dict, table: list[dict], integ: integrity.Integrity) -> dict:
+    """What the verdict rules need besides the score, so a client can re-rank with other weights."""
+    must = [r for r in table if r["importance"] == "must"]
+    missing = sum(1 for r in must if r["status"] == "missing")
+    related = sum(1 for r in must if r["status"] == "related")
+    return {"miss_ratio": round((missing + 0.5 * related) / len(must), 4) if must else 0.0,
+            "missing_ratio": round(missing / len(must), 4) if must else 0.0,
+            "experience": round(parts["experience"], 4), "suspicious": integ.suspicious, "penalty": integ.penalty}
+
+
+def highlights(text: str, table: list[dict], f: Features) -> list[dict]:
+    """Character spans in `text` to colour in the evidence view."""
+    status = {}
+    for r in table:
+        for m in r["members"]:
+            status[m] = r["status"] if r["matched"] == m or r["status"] in ("missing", "related") else status.get(m, "other")
+    spans = []
+    for start, end, skill in skill_spans(text):
+        st = status.get(skill)
+        kind = st if st in ("shown", "listed") else "other"
+        spans.append({"start": start, "end": end, "kind": kind, "label": skill})
+    for skill, phrase in f.related.items():
+        if status.get(skill) != "related":
+            continue
+        key = phrase.rstrip("…")
+        i = text.find(key)
+        if i >= 0:
+            spans.append({"start": i, "end": i + len(key), "kind": "related", "label": skill})
+    for m in QUANT_RE.finditer(text):
+        if re.fullmatch(r"(19|20)\d{2}", m.group(0).strip()):
+            continue                      # a year in a date range is not a result
+        spans.append({"start": m.start(), "end": m.end(), "kind": "metric", "label": "Measurable result"})
+    spans.sort(key=lambda x: (x["start"], -(x["end"] - x["start"])))
+    out, last = [], -1
+    for sp in spans:                      # keep them non-overlapping; longer and earlier wins
+        if sp["start"] >= last:
+            out.append(sp)
+            last = sp["end"]
+    return out
+
+
+def analyze(resume_text: str, jd_text: str, *, assume_skills: list[str] | None = None,
+            spec: jdmod.JobSpec | None = None) -> dict:
+    spec = spec or jdmod.parse(jd_text)
+    jd_skills = set(spec.required) | set(spec.preferred)
+    p, f, integ, pairs = prepare(resume_text, spec)
     if assume_skills:
         f.extra = set(assume_skills)
     parts = score_parts(f, spec)
@@ -521,14 +619,25 @@ def analyze(resume_text: str, jd_text: str, *, assume_skills: list[str] | None =
     risks = [f"Integrity: {flag}" for flag in integ.flags] + risks
     conf, conf_note = _confidence(p)
     resume_skills = sorted(set(f.found) | f.extra)
+    active_w = sum(WEIGHTS[k] for k, v in parts.items() if v is not None)
+    shown_text = mask_pii(p.text)
 
     return {
         "score": score,
         "integrity": integ.as_dict(),
         "verdict": {"key": verdict_key, **VERDICTS[verdict_key], "knockouts": knockouts},
         "confidence": {"level": conf, "note": conf_note},
-        "parts": [{"key": k, "label": PART_LABELS[k], "weight": WEIGHTS[k],
-                   "value": None if v is None else round(v * 100, 1)} for k, v in parts.items()],
+        "parts": [{"key": k, "label": PART_LABELS[k], "weight": round(WEIGHTS[k], 1),
+                   "value": None if v is None else round(v * 100, 1),
+                   # Points this part contributes to the 0-100 score, and the most it could.
+                   "points": None if v is None else round(WEIGHTS[k] / active_w * v * 100, 1),
+                   "max_points": None if v is None else round(WEIGHTS[k] / active_w * 100, 1)}
+                  for k, v in parts.items()],
+        "raw_score": raw_score,
+        "verdict_inputs": verdict_inputs(parts, table, integ),
+        "evidence": {"text": shown_text, "highlights": highlights(shown_text, table, f),
+                     "pairs": [{"job": x["job"], "resume": mask_pii(x["resume"]), "sim": round(x["sim"], 3)}
+                               for x in pairs[:6]]},
         "skills": table,
         "summary": {
             "must_total": len(spec.required), "nice_total": len(spec.preferred),
@@ -537,6 +646,7 @@ def analyze(resume_text: str, jd_text: str, *, assume_skills: list[str] | None =
             "nice_matched": sum(1 for r in table if r["importance"] == "nice" and r["status"] in ("shown", "listed")),
             "years": f.years, "education": f.education_label, "word_count": f.word_count,
             "bullets": f.n_bullets, "quantified": f.n_quant, "similarity": round(f.similarity, 3),
+            "semantic": None if f.semantic is None else round(f.semantic, 3),
         },
         "extra_skills": by_category([s for s in resume_skills if s not in jd_skills]),
         "strengths": strengths,
@@ -577,5 +687,23 @@ def screen(jd_text: str, resumes: list[tuple[str, str]]) -> dict:
     must_units = [" or ".join(g) for imp, g in units(spec) if imp == "must"]
     must_cov = {s: sum(1 for r in results for row in r["skills"]
                        if row["skill"] == s and row["status"] in ("shown", "listed")) for s in must_units}
-    return {"job": job_summary(spec), "candidates": results, "counts": counts,
+    return {"job": job_summary(spec), "candidates": results, "counts": counts, "model": model_info(),
             "skill_coverage": [{"skill": s, "have": n, "of": len(results)} for s, n in must_cov.items()]}
+
+
+def model_info() -> dict:
+    return {"weights": {k: round(v, 1) for k, v in WEIGHTS.items()}, "hand_weights": HAND_WEIGHTS,
+            "weights_source": WEIGHTS_SOURCE, "training": training_report(), "labels": PART_LABELS, "semantic": semantic.status(),
+            "thresholds": {"strong": 74, "shortlist": 62, "verify": 48}}
+
+
+def training_report() -> dict | None:
+    """What eval/train.py found, for the Model quality page."""
+    if not WEIGHTS_FILE.exists():
+        return None
+    try:
+        d = json.loads(WEIGHTS_FILE.read_text(encoding="utf-8"))
+    except ValueError:
+        return None
+    return {k: d.get(k) for k in ("adopted", "weights", "trained_on", "date", "method",
+                                  "hand_metrics", "in_sample", "cross_validated")}

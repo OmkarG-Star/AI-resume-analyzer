@@ -24,6 +24,7 @@ from __future__ import annotations
 import csv
 import io
 import json
+import os
 import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -67,8 +68,11 @@ async def lifespan(_app):
     yield
 
 
+# No public API docs page: the web app is the product. Set API_DOCS=on to enable /api/docs locally.
+_docs = os.environ.get("API_DOCS", "off").lower() in ("on", "1", "true")
 app = FastAPI(title="Resume Intelligence", version=__version__, lifespan=lifespan,
-              docs_url="/api/docs", openapi_url="/api/openapi.json")
+              docs_url="/api/docs" if _docs else None, redoc_url=None,
+              openapi_url="/api/openapi.json" if _docs else None)
 app.add_middleware(GZipMiddleware, minimum_size=800)
 
 
@@ -122,12 +126,15 @@ def with_summary(job: dict) -> dict:
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "version": __version__}
+    return {"status": "ok", "version": __version__, "semantic": engine.semantic.available()}
 
 
 # Accuracy of earlier versions on the same labelled set, for the version history chart.
 MODEL_HISTORY = [
-    {"version": "2.1", "accuracy": 0.767, "kappa": 0.68, "spearman": 0.72, "p_at_3": 0.80, "stuffers_caught": 0},
+    {"version": "2.1", "accuracy": 0.767, "kappa": 0.68, "spearman": 0.72, "p_at_3": 0.80, "stuffers_caught": 0,
+     "note": "Keywords and TF-IDF"},
+    {"version": "2.2", "accuracy": 0.800, "kappa": 0.77, "spearman": 0.84, "p_at_3": 1.00, "stuffers_caught": 3,
+     "note": "Integrity checks, described-not-named credit"},
 ]
 
 
@@ -136,14 +143,17 @@ def model():
     card = evaluation.model_card()
     return {
         "version": __version__,
-        "weights": [{"key": k, "label": engine.PART_LABELS[k], "weight": w} for k, w in engine.WEIGHTS.items()],
+        "weights": [{"key": k, "label": engine.PART_LABELS[k], "weight": round(w, 1)} for k, w in engine.WEIGHTS.items()],
+        "model": engine.model_info(),
         "credits": {"shown": 1.0, "listed": engine.LISTED_ONLY_CREDIT, "related": engine.RELATED_CREDIT},
         "verdicts": [{"key": k, **v} for k, v in engine.VERDICTS.items()],
         "integrity": {"penalties": engine.integrity.PENALTY, "cap": engine.integrity.PENALTY_CAP,
                       "cram_skills": engine.integrity.CRAM_SKILLS, "years_gap": engine.integrity.YEARS_GAP},
         "evaluation": card,
         "history": MODEL_HISTORY + ([{"version": __version__.rsplit(".", 1)[0], **{k: card[k] for k in
-                                      ("accuracy", "kappa", "spearman", "p_at_3", "stuffers_caught")}}] if card else []),
+                                      ("accuracy", "kappa", "spearman", "p_at_3", "stuffers_caught")},
+                                      "note": "Meaning match (MiniLM)" if card.get("semantic") else "Keyword matching only"}]
+                                    if card else []),
     }
 
 

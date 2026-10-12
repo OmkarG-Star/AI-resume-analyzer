@@ -20,6 +20,10 @@ exactly which changes raise their score and by how much.
 | ![Candidates sorted by verdict under a pipeline bar](docs/screenshots/board.png) | ![Score distribution, next steps, must-have coverage and integrity checks](docs/screenshots/insights.png) |
 | **Candidate decision** | **Model quality** |
 | ![Candidate drawer with verdict, reasons, risks and score breakdown](docs/screenshots/candidate.png) | ![Accuracy, kappa, confusion matrix and version history](docs/screenshots/model.png) |
+| **Explain this score** | **Pipeline with notes** |
+| ![Points per part, closest matches by meaning and the highlighted resume](docs/screenshots/explain.png) | ![Candidates dragged through hiring stages](docs/screenshots/pipeline.png) |
+| **Fairness audit** | **Tune weights** |
+| ![Selection rates and impact ratios by group](docs/screenshots/fairness.png) | ![Weight sliders with live re-ranking](docs/screenshots/tune.png) |
 | **Candidate coaching** | **Ranked list** |
 | ![Resume coaching with fixes ranked by score gain and a what-if simulator](docs/screenshots/improve.png) | ![Candidates ranked by score with verdict and top risk](docs/screenshots/ranked.png) |
 
@@ -50,7 +54,13 @@ exactly which changes raise their score and by how much.
 ### Recruiter: screen candidates
 - Upload a job description and up to 50 resumes (**PDF, DOCX, TXT**).
 - Every candidate gets a verdict: **Strong shortlist · Shortlist · Interview to verify · Not a fit**, with the knockout rules that triggered it.
-- **Why** and **Risks to check** in plain sentences, plus a 7-part score breakdown.
+- **Why** and **Risks to check** in plain sentences, plus an 8-part score breakdown.
+- **Explain this score**: where every point came from, the closest job-to-resume matches by meaning, and the resume with matched skills, listed-only skills, described-not-named work and measurable results highlighted.
+- **Pipeline**: drag candidates through New → Phone screen → Interview → Offer → Hired / Rejected, with **notes** and **tags** (kept in the browser tab only).
+- **Fairness audit**: selection rates and impact ratios by experience band, education, resume length or groups you assign, flagged against the four-fifths rule.
+- **Tune weights** with sliders or presets; ranks change live with an arrow showing who moved, and one click resets to the model.
+- **Click any number** (KPIs, pipeline counts, model metrics) for a pop-up with the detail behind it.
+- **Remove** candidates, notes, tags, resumes and session history, each with **Undo**.
 - **Interview kit**: questions written from that person's gaps ("Your resume lists Tableau but no project shows it…").
 - **Candidate feedback** you can paste into a reply, whatever the decision.
 - A **verdict pipeline bar** over three tabs: **Board** (Kanban by verdict), **Ranked list** and **Insights** (keys `1` `2` `3`).
@@ -72,15 +82,20 @@ exactly which changes raise their score and by how much.
 
 | Part | Weight | What it measures |
 |---|---|---|
-| Must-have skills | 38 | Share of required skills found. **Shown in a job/project bullet = full credit; only in a skills list = 70%; work described without naming the tool = 40%.** |
+| Must-have skills | 34 | Share of required skills found. **Shown in a job/project bullet = full credit; only in a skills list = 70%; work described without naming the tool = 40%.** |
 | Experience | 14 | Years from dated roles (overlaps merged) vs the job's minimum |
-| Overall relevance | 13 | TF-IDF cosine similarity between resume and job (1–2 grams) |
-| Evidence of impact | 12 | Measurable results, action-verb bullets, skills demonstrated in context |
-| Nice-to-have skills | 10 | Same as must-haves, for preferred skills |
-| Resume quality | 8 | Contact details, standard sections, length, measurable bullets |
+| Meaning match | 12 | How closely the meaning of the resume's work lines matches the job's lines (MiniLM sentence embeddings) |
+| Evidence of impact | 11 | Measurable results, action-verb bullets, skills demonstrated in context |
+| Nice-to-have skills | 9 | Same as must-haves, for preferred skills |
+| Keyword relevance | 8 | TF-IDF cosine similarity between resume and job (1–2 grams) |
+| Resume quality | 7 | Contact details, standard sections, length, measurable bullets |
 | Education | 5 | Highest level found vs required level |
 
-Parts that don't apply (e.g. no education requirement) are dropped and the rest re-weighted.
+Parts that don't apply (e.g. no education requirement) are dropped and the rest re-weighted. Recruiters can change the weights for a screening with **Tune weights**; ranks and verdicts update live.
+
+**Meaning match.** A small sentence-embedding model (all-MiniLM-L6-v2, exported to ONNX, about 90 MB, run with onnxruntime: no PyTorch, so it fits a 512 MB server) compares every line of the job with the resume's work lines. It also spots must-have skills described in other words: a work line within 0.55 cosine similarity of a skill's description counts as *Described, not named*. If the model files are missing, the app falls back to keyword matching and says so on the Model quality page.
+
+**Learned weights, adopted only when they win.** `python eval/train.py --write` fits the weights to the labelled set (squared hinge to each label's score band, pulled toward the hand-set weights) and tests them with leave-one-resume-out cross-validation. They are used only if they beat the hand-set weights on resumes the fit never saw. On the current 60 author-labelled pairs they don't (kappa 0.77 vs 0.79), so the hand-set weights stay; with real recruiter labels, re-running the script switches over automatically when learning helps.
 
 **Reading the job.** Skills under *Requirements* are must-haves. Skills under *Nice to have*, or in sentences with "preferred", "bonus" or "a plus", are nice-to-haves. Skills that appear only in the duties count as nice-to-haves when the advert has an explicit requirements list. **"Power BI or Tableau" is one requirement**: either skill satisfies it.
 
@@ -154,13 +169,14 @@ src/resume_ai/
   skills.py          taxonomy, aliases, implications, plain-language "related" phrases, span matching
   integrity.py       copied job text, crammed bullets, inflated years claims
   jd.py              must-have / nice-to-have split, either-or groups, years, education, seniority
-  engine.py          features, 7-part score, verdicts, reasons, questions, suggestions, rewrites
+  engine.py          features, 8-part score, verdicts, reasons, questions, suggestions, rewrites, evidence spans
+  semantic.py        MiniLM ONNX sentence embeddings (optional; falls back to keywords)
   evaluation.py      agreement with the labelled set (CLI and /api/model)
   store.py           job library: SQLite CRUD for job descriptions and screening counts
   api.py             FastAPI: analyze, screen, export, parse-file, /api/jobs CRUD
 samples/             job descriptions, seed job library and 6 fictional resumes
 eval/                labelled resume-job pairs and evaluate.py (accuracy, kappa, Spearman)
-tests/               39 pytest tests (parsing, skills, JD, engine, integrity, API, job library, eval baseline)
+tests/               42 pytest tests (parsing, skills, JD, engine, integrity, API, job library, eval baseline)
 legacy/              the original Streamlit + TF-IDF version, kept for comparison
 ```
 
@@ -170,8 +186,9 @@ legacy/              the original Streamlit + TF-IDF version, kept for compariso
 git clone https://github.com/OmkarG-Star/AI-resume-analyzer.git
 cd ai-resume-analyzer
 pip install -r requirements.txt
+python scripts/fetch_model.py          # optional: the meaning-match model (~90 MB)
 PYTHONPATH=src uvicorn resume_ai.api:app --reload
-# open http://localhost:8000  ·  API docs at /api/docs
+# open http://localhost:8000
 ```
 
 Tests:
@@ -217,6 +234,7 @@ The library lives in SQLite at `JOBS_DB` (default `data/jobs.db`) and is seeded 
 
 ## Version history
 
+- **v2.3**: meaning-based matching (MiniLM, ONNX), a weight-learning pipeline with honest cross-validation, explain-this-score with a highlighted resume, pipeline stages with notes and tags, fairness audit, live weight tuning, clickable KPI pop-ups, delete with undo everywhere, and no public API docs page.
 - **v2.2**: integrity checks against keyword stuffing, partial credit for work described without tool names, batch-independent scores, and an evaluation set with accuracy metrics. New console UI in a bright light theme: an icon-rail sidebar that expands on hover, colour-coded workspaces, overview dashboard, insights tab, model quality page, command palette, keyboard shortcuts and a staged screening run.
 - **v2.1**: company job library: saved job descriptions with status, team and openings, live requirement preview, one-click screening and per-job counts.
 - **v2.0**: rebuilt as a two-sided product: structured job parsing, evidence-weighted scoring, verdicts with reasons, interview kit, candidate coaching with measured gains, premium web UI, tests and CI.

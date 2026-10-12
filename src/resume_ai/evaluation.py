@@ -70,18 +70,12 @@ def weighted_kappa(truth: list[str], pred: list[str]) -> float:
     return 1 - o / e if e else 0.0
 
 
-def run(engine=None) -> dict:
-    """Score every labelled pair. `engine` defaults to this package's engine."""
-    if engine is None:
-        from . import engine
-    rows = list(csv.DictReader(open(ROOT / "eval" / "labels.csv", encoding="utf-8")))
-    jobs = {k: (ROOT / v).read_text(encoding="utf-8") for k, v in JOBS.items()}
-    results = []
-    for r in rows:
-        out = engine.analyze((ROOT / r["resume"]).read_text(encoding="utf-8"), jobs[r["job"]])
-        results.append({**r, "score": out["score"], "verdict": out["verdict"]["label"],
-                        "pred": VERDICT_CLASS[out["verdict"]["key"]]})
+def _rows() -> list[dict]:
+    return list(csv.DictReader(open(ROOT / "eval" / "labels.csv", encoding="utf-8")))
 
+
+def metrics(results: list[dict]) -> dict:
+    """Agreement metrics for [{label, pred, score, job, note, ...}]."""
     truth = [r["label"] for r in results]
     pred = [r["pred"] for r in results]
     by_job = defaultdict(list)
@@ -110,17 +104,60 @@ def run(engine=None) -> dict:
     }
 
 
+def run(engine=None) -> dict:
+    """Score every labelled pair with the engine as configured. `engine` defaults to this package's."""
+    if engine is None:
+        from . import engine
+    jobs = {k: (ROOT / v).read_text(encoding="utf-8") for k, v in JOBS.items()}
+    results = []
+    for r in _rows():
+        out = engine.analyze((ROOT / r["resume"]).read_text(encoding="utf-8"), jobs[r["job"]])
+        results.append({**r, "score": out["score"], "verdict": out["verdict"]["label"],
+                        "pred": VERDICT_CLASS[out["verdict"]["key"]]})
+    return metrics(results)
 
-@lru_cache(maxsize=1)
-def model_card() -> dict | None:
-    """Metrics for the web app, computed once per process. None when eval/ is absent."""
+
+def prepared() -> list[dict]:
+    """Weight-independent state for every labelled pair, so weights can be re-tried quickly."""
+    from . import engine
+    from . import jd as jdmod
+    specs = {k: jdmod.parse((ROOT / v).read_text(encoding="utf-8")) for k, v in JOBS.items()}
+    out = []
+    for r in _rows():
+        spec = specs[r["job"]]
+        p, f, integ, _ = engine.prepare((ROOT / r["resume"]).read_text(encoding="utf-8"), spec)
+        parts = engine.score_parts(f, spec)
+        out.append({**r, "parts": parts, "table": engine._skill_table(spec, f), "integ": integ})
+    return out
+
+
+def score_with(pp: list[dict], weights: dict[str, float]) -> list[dict]:
+    """Scores and verdicts for prepared pairs under the given weights."""
+    from . import engine
+    res = []
+    for x in pp:
+        score = round(max(0.0, engine.overall(x["parts"], weights) - x["integ"].penalty), 1)
+        key, _ = engine._verdict(score, x["parts"], x["table"], x["integ"])
+        res.append({k: x[k] for k in ("resume", "job", "label", "note")}
+                   | {"score": score, "verdict": engine.VERDICTS[key]["label"], "pred": VERDICT_CLASS[key]})
+    return res
+
+
+CARD_FILE = ROOT / "eval" / "model_card.json"
+
+
+def build_card() -> dict | None:
+    """Agreement with the labelled set for the current engine. None when eval/ is absent."""
     if not (ROOT / "eval" / "labels.csv").exists():
         return None
+    from . import __version__, semantic
     m = run()
     keep = ("n", "accuracy", "kappa", "spearman", "p_at_1", "p_at_3", "false_rejections", "good",
             "stuffers_caught", "stuffers")
     return {
         **{k: m[k] for k in keep},
+        "version": __version__,
+        "semantic": semantic.available(),
         "labels": CLASSES,
         "confusion": [[m["confusion"].get((t, p), 0) for p in CLASSES] for t in CLASSES],
         "disagreements": [{"resume": Path(r["resume"]).stem, "job": r["job"], "label": r["label"],
@@ -128,3 +165,26 @@ def model_card() -> dict | None:
                           for r in m["results"] if r["label"] != r["pred"]],
         "jobs": JOB_NAMES,
     }
+
+
+def write_card() -> None:
+    """Pre-compute the card (the Docker build runs this) so the server does no work at startup."""
+    import json
+    card = build_card()
+    if card:
+        CARD_FILE.write_text(json.dumps(card, indent=1) + "\n", encoding="utf-8")
+
+
+@lru_cache(maxsize=1)
+def model_card() -> dict | None:
+    """The card for the web app: the pre-computed file when it matches this version, else computed once."""
+    import json
+    from . import __version__, semantic
+    if CARD_FILE.exists():
+        try:
+            card = json.loads(CARD_FILE.read_text(encoding="utf-8"))
+            if card.get("version") == __version__ and card.get("semantic") == semantic.available():
+                return card
+        except ValueError:
+            pass
+    return build_card()
