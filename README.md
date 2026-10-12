@@ -20,8 +20,8 @@ exactly which changes raise their score and by how much.
 | ![Candidates sorted by verdict under a pipeline bar](docs/screenshots/board.png) | ![Score distribution, next steps, must-have coverage and integrity checks](docs/screenshots/insights.png) |
 | **Candidate decision** | **Model quality** |
 | ![Candidate drawer with verdict, reasons, risks and score breakdown](docs/screenshots/candidate.png) | ![Accuracy, kappa, confusion matrix and version history](docs/screenshots/model.png) |
-| **Candidate coaching** | **Command palette and dark theme** |
-| ![Resume coaching with fixes ranked by score gain and a what-if simulator](docs/screenshots/improve.png) | ![Ranked list in dark mode](docs/screenshots/dark.png) |
+| **Candidate coaching** | **Ranked list** |
+| ![Resume coaching with fixes ranked by score gain and a what-if simulator](docs/screenshots/improve.png) | ![Candidates ranked by score with verdict and top risk](docs/screenshots/ranked.png) |
 
 *All people, companies and resumes in the demo are fictional.*
 
@@ -217,7 +217,7 @@ The library lives in SQLite at `JOBS_DB` (default `data/jobs.db`) and is seeded 
 
 ## Version history
 
-- **v2.2**: integrity checks against keyword stuffing, partial credit for work described without tool names, batch-independent scores, and an evaluation set with accuracy metrics. New console UI: overview dashboard, insights tab, model quality page, command palette, keyboard shortcuts, collapsible sidebar and a staged screening run.
+- **v2.2**: integrity checks against keyword stuffing, partial credit for work described without tool names, batch-independent scores, and an evaluation set with accuracy metrics. New console UI in a bright light theme: an icon-rail sidebar that expands on hover, colour-coded workspaces, overview dashboard, insights tab, model quality page, command palette, keyboard shortcuts and a staged screening run.
 - **v2.1**: company job library: saved job descriptions with status, team and openings, live requirement preview, one-click screening and per-job counts.
 - **v2.0**: rebuilt as a two-sided product: structured job parsing, evidence-weighted scoring, verdicts with reasons, interview kit, candidate coaching with measured gains, premium web UI, tests and CI.
 - **v1.0** (`legacy/`): Streamlit app with TF-IDF cosine similarity and a fixed 28-skill list.

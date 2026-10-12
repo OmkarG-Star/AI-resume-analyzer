@@ -458,7 +458,7 @@ const App = (() => {
       <div class="jobs-grid">${[0, 1, 2].map(() => '<div class="sk" style="height:260px"></div>').join('')}</div>`;
     const all = S.jobs, open = all.filter(j => j.status === 'Open');
     const sum = k => all.reduce((a, j) => a + (j[k] || 0), 0);
-    const kpi = (k, label, v, c, help) => `<div class="kpi anim" style="--c:${c}"><div class="k">${I(k, 14)}${label}${help ? tip(help) : ''}</div><div class="v" data-count>${v}</div></div>`;
+    const kpi = (k, label, v, c, help) => `<div class="kpi anim" style="--c:${c}"><div class="k">${I(k, 16)}${label}${help ? tip(help) : ''}</div><div class="v" data-count>${v}</div></div>`;
     const count = st => st === 'All' ? all.length : all.filter(j => j.status === st).length;
     return `
     <div class="page-head anim">
@@ -467,10 +467,10 @@ const App = (() => {
       <button class="btn btn-grad" data-act="new-job">${I('plus', 16)} New job</button>
     </div>
     <div class="kpis k4">
-      ${kpi('briefcase', 'Open roles', open.length, 'var(--iris)')}
-      ${kpi('users', 'Open positions', open.reduce((a, j) => a + j.openings, 0), 'var(--teal)', 'Headcount still to fill across open roles.')}
-      ${kpi('fileText', 'Resumes screened', sum('candidates_screened'), 'var(--amber)', 'Total across all screenings. Only the count is kept, never the resumes.')}
-      ${kpi('star', 'Shortlisted', sum('shortlisted'), 'var(--green)', 'Candidates who reached Strong shortlist or Shortlist.')}
+      ${kpi('briefcase', 'Open roles', open.length, 'var(--c-blue)')}
+      ${kpi('users', 'Open positions', open.reduce((a, j) => a + j.openings, 0), 'var(--c-violet)', 'Headcount still to fill across open roles.')}
+      ${kpi('fileText', 'Resumes screened', sum('candidates_screened'), 'var(--c-teal)', 'Total across all screenings. Only the count is kept, never the resumes.')}
+      ${kpi('star', 'Shortlisted', sum('shortlisted'), 'var(--c-pink)', 'Candidates who reached Strong shortlist or Shortlist.')}
     </div>
     <div class="toolbar">
       <div class="seg" role="tablist">${['All', ...S.jobMeta.statuses].map(st => `<button class="${S.jobFilter === st ? 'on' : ''}" data-act="job-filter" data-f="${esc(st)}">${esc(st)}<span class="seg-n">${count(st)}</span></button>`).join('')}</div>
@@ -843,25 +843,25 @@ const App = (() => {
     if (!reco.length) reco.push(['check', 'The pool covers the must-haves well. Start with the strong shortlist.']);
     return `<div class="insights">
       <div class="stats4">
-        <div class="stat anim"><span>Average score</span><b data-count>${Math.round(avg)}</b><em>median ${Math.round(med)}</em></div>
-        <div class="stat anim"><span>Shortlist rate</span><b>${pct(d.counts.strong + d.counts.shortlist, n)}%</b><em>${d.counts.strong + d.counts.shortlist} of ${n} candidates</em></div>
-        <div class="stat anim"><span>Must-haves nobody has</span><b data-count>${gaps.length}</b><em>of ${d.skill_coverage.length} requirements</em></div>
-        <div class="stat anim"><span>Integrity flags</span><b data-count>${fl.length}</b><em>${fl.length ? 'read before deciding' : 'no stuffing detected'}</em></div>
+        <div class="stat anim" style="--c:var(--c-violet)"><span class="sic">${I('gauge', 16)}</span><span>Average score</span><b data-count>${Math.round(avg)}</b><em>median ${Math.round(med)}</em></div>
+        <div class="stat anim" style="--c:var(--c-green)"><span class="sic">${I('star', 16)}</span><span>Shortlist rate</span><b>${pct(d.counts.strong + d.counts.shortlist, n)}%</b><em>${d.counts.strong + d.counts.shortlist} of ${n} candidates</em></div>
+        <div class="stat anim" style="--c:var(--c-pink)"><span class="sic">${I('target', 16)}</span><span>Must-haves nobody has</span><b data-count>${gaps.length}</b><em>of ${d.skill_coverage.length} requirements</em></div>
+        <div class="stat anim" style="--c:var(--c-orange)"><span class="sic">${I('anomaly', 16)}</span><span>Integrity flags</span><b data-count>${fl.length}</b><em>${fl.length ? 'read before deciding' : 'no stuffing detected'}</em></div>
       </div>
       <div class="grid g2">
-        <section class="card anim"><div class="card-head"><div><h2>Score distribution</h2><p>Candidates per 10-point band. Lines mark the verdict thresholds: 48 Interview to verify, 62 Shortlist, 74 Strong shortlist.</p></div></div>
+        <section class="card anim"><div class="card-head"><div><h2><span class="hic" style="--c:var(--c-violet)">${I('trendUp', 16)}</span>Score distribution</h2><p>Candidates per 10-point band. Lines mark the verdict thresholds: 48 Interview to verify, 62 Shortlist, 74 Strong shortlist.</p></div></div>
           <div class="card-body">${histogram(cs)}</div></section>
-        <section class="card anim"><div class="card-head"><div><h2>What to do next</h2><p>Read from this pool's gaps and flags.</p></div></div>
+        <section class="card anim"><div class="card-head"><div><h2><span class="hic" style="--c:var(--c-amber)">${I('compass', 16)}</span>What to do next</h2><p>Read from this pool's gaps and flags.</p></div></div>
           <div class="card-body"><ul class="reco">${reco.map(([ic, t], i) => `<li style="--i:${i}"><span class="hic">${I(ic, 15)}</span><span>${esc(t)}</span></li>`).join('')}</ul></div></section>
-        <section class="card anim"><div class="card-head"><div><h2>Must-have coverage</h2><p>Share of candidates who show or list each requirement, rarest first.</p></div></div>
+        <section class="card anim"><div class="card-head"><div><h2><span class="hic" style="--c:var(--c-teal)">${I('target', 16)}</span>Must-have coverage</h2><p>Share of candidates who show or list each requirement, rarest first.</p></div></div>
           <div class="card-body">${coverageBars(d.skill_coverage)}</div></section>
-        <section class="card anim"><div class="card-head"><div><h2>Integrity checks</h2><p>Copied job text, crammed bullets and inflated years. Flagged resumes stop at <b>Interview to verify</b>.</p></div></div>
+        <section class="card anim"><div class="card-head"><div><h2><span class="hic" style="--c:var(--c-orange)">${I('anomaly', 16)}</span>Integrity checks</h2><p>Copied job text, crammed bullets and inflated years. Flagged resumes stop at <b>Interview to verify</b>.</p></div></div>
           <div class="card-body">${fl.length ? `<div class="stack" style="gap:8px">${fl.map(c => `<button class="flag-row" data-cand="${c.id}">${avatar(c)}<div><b>${esc(candName(c))}</b>
             <div class="small muted">${c.integrity.flags.map(esc).join(' · ')}</div></div><span class="small">−${c.integrity.penalty}</span></button>`).join('')}</div>`
             : `<div class="empty-mini">${I('shield', 22)}<b>No integrity flags</b><span class="small muted">No copied job text, crammed bullets or inflated experience in this pool.</span></div>`}</div></section>
       </div>
       <section class="card anim" style="margin-top:16px">
-        <div class="card-head"><div><h2>Skill heatmap</h2><p>Every candidate against every must-have. Hover a cell for detail.</p></div>
+        <div class="card-head"><div><h2><span class="hic" style="--c:var(--c-blue)">${I('layers', 16)}</span>Skill heatmap</h2><p>Every candidate against every must-have. Hover a cell for detail.</p></div>
           <div class="legend"><span><i style="background:var(--green)"></i>Shown in work</span><span><i style="background:color-mix(in srgb,var(--amber) 55%,transparent)"></i>Listed only</span><span><i style="background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--amber) 45%,transparent) 0 3px,var(--surface-3) 3px 6px)"></i>Described, not named</span><span><i style="background:var(--surface-3)"></i>Missing</span></div></div>
         <div class="card-body heat">${heatmap()}</div>
       </section>
@@ -872,7 +872,7 @@ const App = (() => {
   function overviewPage() {
     const jobs = S.jobs || [], open = jobs.filter(j => j.status === 'Open');
     const screened = jobs.reduce((a, j) => a + (j.candidates_screened || 0), 0), short = jobs.reduce((a, j) => a + (j.shortlisted || 0), 0);
-    const kpi = (k, label, v, sub, suffix = '') => `<div class="kpi anim"><div class="k">${I(k, 14)}${label}</div><div class="v"><span data-count>${v}</span>${suffix}</div><div class="kpi-sub">${sub}</div></div>`;
+    const kpi = (k, label, v, sub, c, suffix = '') => `<div class="kpi anim" style="--c:${c}"><div class="k">${I(k, 16)}${label}</div><div class="v"><span data-count>${v}</span>${suffix}</div><div class="kpi-sub">${sub}</div></div>`;
     const tot = { strong: 0, shortlist: 0, verify: 0, reject: 0 };
     S.activity.forEach(a => ORDER.forEach(k => tot[k] += a.counts[k]));
     const sessN = S.activity.reduce((a, x) => a + x.n, 0), ev = S.model?.evaluation;
@@ -881,14 +881,14 @@ const App = (() => {
     <div class="page-head anim"><div><h1>Hiring overview</h1>
       <p>Open roles, screening activity and how far you can trust the screener, on one page.</p></div></div>
     <div class="kpis k4">
-      ${kpi('briefcase', 'Open roles', open.length, `${jobs.length} in the library`)}
-      ${kpi('users', 'Positions to fill', open.reduce((a, j) => a + j.openings, 0), 'across open roles')}
-      ${kpi('fileText', 'Resumes screened', screened, 'all time, counts only')}
-      ${kpi('star', 'Shortlist rate', pct(short, screened), `${short} shortlisted`, '%')}
+      ${kpi('briefcase', 'Open roles', open.length, `${jobs.length} in the library`, 'var(--c-blue)')}
+      ${kpi('users', 'Positions to fill', open.reduce((a, j) => a + j.openings, 0), 'across open roles', 'var(--c-violet)')}
+      ${kpi('fileText', 'Resumes screened', screened, 'all time, counts only', 'var(--c-teal)')}
+      ${kpi('star', 'Shortlist rate', pct(short, screened), `${short} shortlisted`, 'var(--c-pink)', '%')}
     </div>
     <div class="grid g-ov" style="margin-top:16px">
       <div class="stack">
-        <section class="card anim"><div class="card-head"><div><h2>This session</h2><p>Screenings you run here. Nothing about candidates is saved.</p></div>
+        <section class="card anim"><div class="card-head"><div><h2><span class="hic" style="--c:var(--c-teal)">${I('users', 16)}</span>This session</h2><p>Screenings you run here. Nothing about candidates is saved.</p></div>
           ${S.activity.length ? `<a class="btn btn-sm" href="#/screen">${I('board', 14)} Open latest</a>` : ''}</div>
           <div class="card-body">${S.activity.length ? `
             ${pipelineBar(tot, sessN, true)}
@@ -897,7 +897,7 @@ const App = (() => {
               <span class="tiny muted">${ago(a.at)}</span></div>`).join('')}</div>`
             : `<div class="empty-mini big">${I('play', 24)}<b>No screenings yet</b><span class="small muted">Run the sample to see a full ranked board, insights and interview kits in about a second.</span>
               <button class="btn btn-grad" data-act="demo-screen">${I('play', 15)} Run a sample screening</button></div>`}</div></section>
-        <section class="card anim"><div class="card-head"><div><h2>Open roles</h2><p>Screen new applicants against a saved job in one click.</p></div>
+        <section class="card anim"><div class="card-head"><div><h2><span class="hic" style="--c:var(--c-blue)">${I('briefcase', 16)}</span>Open roles</h2><p>Screen new applicants against a saved job in one click.</p></div>
           <a class="btn btn-sm btn-ghost" href="#/jobs">View library ${I('chevronRight', 14)}</a></div>
           <div class="card-body roles">${S.jobs === null ? '<div class="sk" style="height:140px"></div>' : open.length ? open.slice(0, 5).map((j, i) => `
             <div class="role" style="--i:${i}"><span class="hic">${I('briefcase', 15)}</span>
@@ -908,7 +908,7 @@ const App = (() => {
             : `<div class="empty-mini">${I('folder', 22)}<b>No open roles</b><button class="btn btn-sm btn-primary" data-act="new-job">${I('plus', 14)} New job</button></div>`}</div></section>
       </div>
       <div class="stack">
-        <section class="card anim model-card"><div class="card-head"><div><h2>Model health</h2><p>Agreement with ${ev ? ev.n : '…'} human-labelled decisions.</p></div>
+        <section class="card anim model-card"><div class="card-head"><div><h2><span class="hic" style="--c:var(--c-green)">${I('shield', 16)}</span>Model health</h2><p>Agreement with ${ev ? ev.n : '…'} human-labelled decisions.</p></div>
           <span class="pill v-strong"><i class="dot"></i>v${esc(S.model?.version || '2.2')}</span></div>
           <div class="card-body">${ev ? `<div class="mh">${ring(ev.kappa * 100, 92, 9, 'var(--iris)', ev.kappa.toFixed(2))}
               <div><b>Weighted kappa</b><p class="small muted">Agreement beyond chance. Above 0.6 is substantial, above 0.8 near-perfect.</p></div></div>
@@ -916,12 +916,12 @@ const App = (() => {
               <div><span>Stuffers caught</span><b>${ev.stuffers_caught}/${ev.stuffers}</b></div></div>
             <a class="btn btn-sm btn-ghost" style="margin-top:12px" href="#/model">See the full evaluation ${I('chevronRight', 14)}</a>`
             : '<div class="sk" style="height:170px"></div>'}</div></section>
-        <section class="card anim"><div class="card-head"><div><h2>Quick actions</h2></div></div>
+        <section class="card anim"><div class="card-head"><div><h2><span class="hic" style="--c:var(--c-pink)">${I('bolt', 16)}</span>Quick actions</h2></div></div>
           <div class="card-body qa">
-            <button data-act="new-job">${I('plus', 16)}<span><b>New job</b><em>Add a role to the library</em></span></button>
-            <a href="#/screen">${I('users', 16)}<span><b>Screen candidates</b><em>Rank up to 50 resumes</em></span></a>
-            <a href="#/improve">${I('wand', 16)}<span><b>Improve a resume</b><em>Candidate coaching</em></span></a>
-            <button data-act="palette">${I('search', 16)}<span><b>Search everything</b><em><span class="kbd">${MOD} K</span></em></span></button>
+            <button data-act="new-job" style="--c:var(--c-blue)">${I('plus', 16)}<span><b>New job</b><em>Add a role to the library</em></span></button>
+            <a href="#/screen" style="--c:var(--c-teal)">${I('users', 16)}<span><b>Screen candidates</b><em>Rank up to 50 resumes</em></span></a>
+            <a href="#/improve" style="--c:var(--c-pink)">${I('wand', 16)}<span><b>Improve a resume</b><em>Candidate coaching</em></span></a>
+            <button data-act="palette" style="--c:var(--c-violet)">${I('search', 16)}<span><b>Search everything</b><em><span class="kbd">${MOD} K</span></em></span></button>
           </div></section>
       </div>
     </div>`;
@@ -940,7 +940,7 @@ const App = (() => {
     const m = S.model, ev = m.evaluation, prev = m.history.length > 1 ? m.history[m.history.length - 2] : null;
     const delta = (v, p, fmt, pctp) => p == null ? '' : (() => { const d = v - p; if (Math.abs(d) < 1e-9) return '<em class="flat">no change</em>';
       return `<em class="${d > 0 ? 'up' : 'down'}">${I(d > 0 ? 'trendUp' : 'trendDown', 12)}${d > 0 ? '+' : ''}${pctp ? (d * 100).toFixed(1) + ' pts' : fmt(d)} vs v${prev.version}</em>`; })();
-    const tile = (label, val, sub, dl, help) => `<div class="mtile anim"><div class="k">${label}${tip(help)}</div><div class="v">${val}</div>${dl || ''}<div class="kpi-sub">${sub}</div></div>`;
+    const tile = (label, val, sub, dl, help, c, ic) => `<div class="mtile anim" style="--c:${c}"><div class="k">${I(ic, 16)}${label}${tip(help)}</div><div class="v">${val}</div>${dl || ''}<div class="kpi-sub">${sub}</div></div>`;
     if (!ev) return `<div class="page-head"><div><h1>Model quality</h1><p>The labelled evaluation set is not included in this deployment.</p></div></div>`;
     const maxC = Math.max(...ev.confusion.flat());
     const labels = { reject: 'Not a fit', maybe: 'Interview to verify', shortlist: 'Shortlist' };
@@ -949,39 +949,39 @@ const App = (() => {
       <p>How often the screener agrees with a person, measured on ${ev.n} labelled resume–job pairs. Rules, weights and results are all on this page.</p></div>
       <span class="pill v-shortlist"><i class="dot"></i>Engine v${esc(m.version)}</span></div>
     <div class="mtiles">
-      ${tile('Verdict accuracy', `${(ev.accuracy * 100).toFixed(1)}%`, 'shortlist / maybe / reject', delta(ev.accuracy, prev?.accuracy, null, true), 'Share of pairs where the verdict class matches the human label.')}
-      ${tile('Weighted kappa', ev.kappa.toFixed(2), 'agreement beyond chance', delta(ev.kappa, prev?.kappa, d => d.toFixed(2)), 'Cohen’s kappa with linear weights: a one-step miss costs half a two-step miss. 0.61–0.80 is substantial agreement.')}
-      ${tile('Spearman rho', ev.spearman.toFixed(2), 'score order vs labels', delta(ev.spearman, prev?.spearman, d => d.toFixed(2)), 'Whether higher scores go to the people a human rated higher.')}
-      ${tile('Precision at 3', `${Math.round(ev.p_at_3 * 100)}%`, 'top 3 per job worth interviewing', delta(ev.p_at_3, prev?.p_at_3, null, true), 'For each job, the share of the top three candidates a person labelled shortlist or maybe.')}
-      ${tile('Stuffers caught', `${ev.stuffers_caught}/${ev.stuffers}`, 'kept off the shortlist', prev ? delta(ev.stuffers_caught, prev.stuffers_caught, d => `${d}`) : '', 'Resumes that paste the job description or cram every tool into one line.')}
-      ${tile('Good candidates rejected', `${ev.false_rejections}/${ev.good}`, 'labelled shortlist or maybe', '', 'The costliest error for a screener: someone worth talking to who gets Not a fit.')}
+      ${tile('Verdict accuracy', `${(ev.accuracy * 100).toFixed(1)}%`, 'shortlist / maybe / reject', delta(ev.accuracy, prev?.accuracy, null, true), 'Share of pairs where the verdict class matches the human label.', 'var(--c-blue)', 'check')}
+      ${tile('Weighted kappa', ev.kappa.toFixed(2), 'agreement beyond chance', delta(ev.kappa, prev?.kappa, d => d.toFixed(2)), 'Cohen’s kappa with linear weights: a one-step miss costs half a two-step miss. 0.61–0.80 is substantial agreement.', 'var(--c-iris)', 'scale')}
+      ${tile('Spearman rho', ev.spearman.toFixed(2), 'score order vs labels', delta(ev.spearman, prev?.spearman, d => d.toFixed(2)), 'Whether higher scores go to the people a human rated higher.', 'var(--c-violet)', 'trendUp')}
+      ${tile('Precision at 3', `${Math.round(ev.p_at_3 * 100)}%`, 'top 3 per job worth interviewing', delta(ev.p_at_3, prev?.p_at_3, null, true), 'For each job, the share of the top three candidates a person labelled shortlist or maybe.', 'var(--c-teal)', 'target')}
+      ${tile('Stuffers caught', `${ev.stuffers_caught}/${ev.stuffers}`, 'kept off the shortlist', prev ? delta(ev.stuffers_caught, prev.stuffers_caught, d => `${d}`) : '', 'Resumes that paste the job description or cram every tool into one line.', 'var(--c-orange)', 'shield')}
+      ${tile('Good candidates rejected', `${ev.false_rejections}/${ev.good}`, 'labelled shortlist or maybe', '', 'The costliest error for a screener: someone worth talking to who gets Not a fit.', 'var(--c-pink)', 'alert')}
     </div>
     <div class="grid g2" style="margin-top:16px">
-      <section class="card anim"><div class="card-head"><div><h2>Confusion matrix</h2><p>Rows are the human label, columns the engine’s verdict. The diagonal is agreement.</p></div></div>
+      <section class="card anim"><div class="card-head"><div><h2><span class="hic" style="--c:var(--c-iris)">${I('table', 16)}</span>Confusion matrix</h2><p>Rows are the human label, columns the engine’s verdict. The diagonal is agreement.</p></div></div>
         <div class="card-body"><div class="cm" role="table" aria-label="Confusion matrix">
           <div class="cm-corner small muted">Human ↓ · Engine →</div>${ev.labels.map(l => `<div class="cm-h">${labels[l]}</div>`).join('')}
           ${ev.labels.map((t, i) => `<div class="cm-h row-h">${labels[t]}</div>${ev.confusion[i].map((v, j) => `<div class="cm-c ${i === j ? 'diag' : ''}" style="--a:${maxC ? v / maxC : 0};--i:${i * 3 + j}" data-tip="Human: ${labels[t]} · Engine: ${labels[ev.labels[j]]} · ${v} pair${v === 1 ? '' : 's'}"><b>${v}</b></div>`).join('')}`).join('')}
         </div>
         <p class="small muted" style="margin-top:12px">Most misses are one step apart (a “maybe” the engine shortlists), which is why weighted kappa is higher than raw accuracy suggests.</p></div></section>
-      <section class="card anim"><div class="card-head"><div><h2>Version history</h2><p>Same labelled set, each engine version.</p></div></div>
+      <section class="card anim"><div class="card-head"><div><h2><span class="hic" style="--c:var(--c-violet)">${I('clock', 16)}</span>Version history</h2><p>Same labelled set, each engine version.</p></div></div>
         <div class="card-body"><div style="overflow-x:auto"><table class="tbl vh"><thead><tr><th>Version</th><th class="num">Accuracy</th><th class="num">Kappa</th><th class="num">Spearman</th><th class="num">P@3</th><th class="num">Stuffers</th></tr></thead>
           <tbody>${[...m.history].reverse().map((h, i) => `<tr class="${i === 0 ? 'cur' : ''}"><td><b>v${esc(h.version)}</b>${i === 0 ? ' <span class="pill v-strong"><i class="dot"></i>current</span>' : ''}</td>
             <td class="num">${(h.accuracy * 100).toFixed(1)}%</td><td class="num">${h.kappa.toFixed(2)}</td><td class="num">${h.spearman.toFixed(2)}</td>
             <td class="num">${Math.round(h.p_at_3 * 100)}%</td><td class="num">${h.stuffers_caught}/${ev.stuffers}</td></tr>`).join('')}</tbody></table></div>
           <ul class="list good" style="margin-top:14px">
             <li>${I('check')}v2.2 added integrity checks, partial credit for work described without tool names, and batch-independent scores.</li></ul></div></section>
-      <section class="card anim"><div class="card-head"><div><h2>Score weights</h2><p>Parts that don’t apply are dropped and the rest re-weighted.</p></div></div>
+      <section class="card anim"><div class="card-head"><div><h2><span class="hic" style="--c:var(--c-amber)">${I('scale', 16)}</span>Score weights</h2><p>Parts that don’t apply are dropped and the rest re-weighted.</p></div></div>
         <div class="card-body weights">${m.weights.map(w => `<div class="weight"><span>${esc(w.label)}</span>${bar(w.weight / 38 * 100)}<b>${w.weight}%</b></div>`).join('')}
           <div class="credit-row">${[['Shown in a bullet', m.credits.shown, 'shown'], ['Only in the skills list', m.credits.listed, 'listed'], ['Described, not named', m.credits.related, 'related']]
             .map(([l, v, c]) => `<div><span class="chip ${c}"><i class="dot"></i>${Math.round(v * 100)}%</span><span class="small muted">${l}</span></div>`).join('')}</div></div></section>
-      <section class="card anim"><div class="card-head"><div><h2>Integrity rules</h2><p>Each finding costs points (capped at ${m.integrity.cap}) and is shown to the recruiter.</p></div></div>
+      <section class="card anim"><div class="card-head"><div><h2><span class="hic" style="--c:var(--c-orange)">${I('shield', 16)}</span>Integrity rules</h2><p>Each finding costs points (capped at ${m.integrity.cap}) and is shown to the recruiter.</p></div></div>
         <div class="card-body"><div class="rules">
           <div><span class="hic">${I('copy', 15)}</span><div><b>Lines copied from the job</b><p class="small muted">Ignored when scoring, −${m.integrity.penalties.copied} points, verdict capped at Interview to verify.</p></div></div>
           <div><span class="hic">${I('layers', 15)}</span><div><b>One bullet naming ${m.integrity.cram_skills}+ required tools</b><p class="small muted">Those skills count as listed, not shown. −${m.integrity.penalties.crammed} points.</p></div></div>
           <div><span class="hic">${I('clock', 15)}</span><div><b>Years claimed far above dated roles</b><p class="small muted">More than ${m.integrity.years_gap} years over: the dated figure is used. −${m.integrity.penalties.years} points.</p></div></div>
         </div></div></section>
     </div>
-    <section class="card anim" style="margin-top:16px"><div class="card-head"><div><h2>Where the engine and the labels disagree</h2><p>${ev.disagreements.length} of ${ev.n} pairs. Each one is a lead for the next improvement.</p></div></div>
+    <section class="card anim" style="margin-top:16px"><div class="card-head"><div><h2><span class="hic" style="--c:var(--c-pink)">${I('alert', 16)}</span>Where the engine and the labels disagree</h2><p>${ev.disagreements.length} of ${ev.n} pairs. Each one is a lead for the next improvement.</p></div></div>
       <div style="overflow-x:auto"><table class="tbl"><thead><tr><th>Resume</th><th>Job</th><th>Human label</th><th>Engine verdict</th><th class="num">Score</th><th>Why the label</th></tr></thead>
         <tbody>${ev.disagreements.map(d => `<tr class="static"><td><b>${esc(d.resume)}</b></td><td>${esc(ev.jobs[d.job] || d.job)}</td><td>${esc(labels[d.label])}</td><td>${esc(d.verdict)}</td><td class="num">${d.score}</td><td class="small muted">${esc(d.note)}</td></tr>`).join('')}</tbody></table></div></section>
     <div class="note anim" style="margin-top:16px">${I('info')}<div><b>How to read these numbers.</b> The resumes are fictional and the labels were written by the project author before the engine ran on them, so this is a regression baseline that shows the method, not a claim about real-world accuracy. Real recruiter labels on anonymised resumes are the next step.</div></div>`;
@@ -1017,7 +1017,6 @@ const App = (() => {
       { l: 'Try candidate coaching with a sample', ic: 'wand', g: 'Actions', run: () => document.dispatchEvent(new CustomEvent('ri-act', { detail: 'demo-improve' })) },
       { l: `Switch to ${document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'} theme`, ic: 'moon', g: 'Preferences', run: () => $('theme').click() },
       { l: `${S.blind ? 'Show' : 'Hide'} candidate names`, ic: S.blind ? 'eye' : 'eyeOff', g: 'Preferences', run: () => { S.blind = !S.blind; store.set('ri2-blind', S.blind ? 'on' : 'off'); render(false); } },
-      { l: `${$('shell').classList.contains('collapsed') ? 'Expand' : 'Collapse'} sidebar`, ic: 'chevronLeft', k: '[', g: 'Preferences', run: toggleCollapse },
       { l: 'Keyboard shortcuts', ic: 'keyboard', k: '?', g: 'Preferences', run: () => { S.shortcuts = true; renderOverlays(); } },
       { l: 'API reference', ic: 'book', g: 'Help', run: () => window.open('/api/docs', '_blank', 'noopener') }];
     (S.jobs || []).filter(j => j.status !== 'Closed').forEach(j => list.push({ l: `Screen against ${j.title}`, sub: j.department, ic: 'briefcase', g: 'Jobs',
@@ -1049,16 +1048,12 @@ const App = (() => {
   function runPalette(i) { const c = paletteResults()[i]; S.palette = null; renderOverlays(); if (c) c.run(); }
 
   function shortcutsModal() {
-    const rows = [[`${MOD} K`, 'Search or jump to anything'], ['?', 'Show this sheet'], ['[', 'Collapse or expand the sidebar'],
-      ['1  2  3', 'Board, ranked list, insights (on results)'], ['←  →', 'Previous or next candidate (in the drawer)'], ['Esc', 'Close the drawer or dialog']];
+    const rows = [[`${MOD} K`, 'Search or jump to anything'], ['?', 'Show this sheet'], ['1  2  3', 'Board, ranked list, insights (on results)'], ['←  →', 'Previous or next candidate (in the drawer)'], ['Esc', 'Close the drawer or dialog']];
     return `<div class="modal-scrim" data-act="close-shortcuts"><div class="modal modal-sm" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts">
       <div class="modal-head"><div><h2><span class="hic">${I('keyboard')}</span>Keyboard shortcuts</h2></div><button class="icon-btn" data-act="close-shortcuts" aria-label="Close">${I('x')}</button></div>
       <div class="sc">${rows.map(([k, l]) => `<div><span>${l}</span><span class="kbd">${esc(k)}</span></div>`).join('')}</div></div></div>`;
   }
 
-  function toggleCollapse() {
-    const c = $('shell').classList.toggle('collapsed'); store.set('ri2-collapsed', c ? '1' : '0');
-  }
 
   /* ---------------------------------------------------------------- actions */
   const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -1179,7 +1174,6 @@ const App = (() => {
         if (a === 'pal-close') { if (ev.target === t) { S.palette = null; renderOverlays(); } return; }
         if (a === 'shortcuts') { S.shortcuts = true; return renderOverlays(); }
         if (a === 'close-shortcuts') { if (ev.target === t || t.classList.contains('icon-btn')) { S.shortcuts = false; renderOverlays(); } return; }
-        if (a === 'collapse') return toggleCollapse();
         if (a === 'drawer-step') return stepDrawer(+t.dataset.d);
         if (a === 'show-flagged') return setView('insights');
         if (a === 'cmp') { ev.stopPropagation(); const id = t.dataset.id;
@@ -1222,7 +1216,6 @@ const App = (() => {
       if (S.run) return;
       if (!typing && !ev.metaKey && !ev.ctrlKey && !ev.altKey && !S.editor && !S.confirm) {
         if (ev.key === '?') { S.shortcuts = !S.shortcuts; return renderOverlays(); }
-        if (ev.key === '[') return toggleCollapse();
         if (S.drawer && (ev.key === 'ArrowLeft' || ev.key === 'ArrowRight')) { ev.preventDefault(); return stepDrawer(ev.key === 'ArrowRight' ? 1 : -1); }
         if (route() === 'screen' && S.screen && !S.drawer && ['1', '2', '3'].includes(ev.key)) return setView(['board', 'table', 'insights'][+ev.key - 1]);
       }
@@ -1277,13 +1270,10 @@ const App = (() => {
     document.addEventListener('dragleave', ev => { const d = ev.target.closest('.drop'); if (d) d.classList.remove('over'); });
     document.addEventListener('drop', ev => { const d = ev.target.closest('.drop'); if (!d) return; ev.preventDefault(); d.classList.remove('over'); uploadFiles([...ev.dataTransfer.files], 'multi'); });
 
-    document.addEventListener('mouseover', ev => {
-      const t = ev.target.closest('[data-tip]'); if (t) return showTip(t);
-      const n = ev.target.closest('[data-tip-side]'); if (n && $('shell').classList.contains('collapsed') && innerWidth > 860) showTip(n, n.dataset.tipSide, true);
-    });
-    document.addEventListener('mouseout', ev => { if (ev.target.closest('[data-tip], [data-tip-side]')) $('tipbox').hidden = true; });
+    document.addEventListener('mouseover', ev => { const t = ev.target.closest('[data-tip]'); if (t) showTip(t); });
+    document.addEventListener('mouseout', ev => { if (ev.target.closest('[data-tip]')) $('tipbox').hidden = true; });
     window.addEventListener('scroll', () => { $('top').classList.toggle('scrolled', scrollY > 4); $('tipbox').hidden = true; }, { passive: true });
-    window.addEventListener('hashchange', () => render());
+    window.addEventListener('hashchange', () => { if (document.activeElement?.closest('.side')) document.activeElement.blur(); render(); });
     $('theme').addEventListener('click', () => {
       const dark = document.documentElement.getAttribute('data-theme') !== 'dark';
       dark ? document.documentElement.setAttribute('data-theme', 'dark') : document.documentElement.removeAttribute('data-theme');
@@ -1330,7 +1320,6 @@ const App = (() => {
     $('theme').innerHTML = I(document.documentElement.getAttribute('data-theme') === 'dark' ? 'sun' : 'moon', 18);
   }
 
-  if (document.documentElement.classList.contains('pre-collapsed')) $('shell').classList.add('collapsed');
   const kk = $('kbd-k'); if (kk) kk.textContent = `${MOD} K`;
   Icons.hydrate();
   setThemeIcon();

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Resume Intelligence</title>
 <meta name="description" content="Explainable resume screening for recruiters and honest resume coaching for candidates.">
-<meta name="theme-color" content="#5B5BD6">
+<meta name="theme-color" content="#F5F7FC">
 <meta property="og:title" content="Resume Intelligence: screen resumes with reasons, not guesses">
 <meta property="og:description" content="Rank candidates with clear verdicts, risks and interview questions, or see exactly what to fix in your own resume.">
 <meta property="og:type" content="website">
@@ -16,8 +16,7 @@
 <link rel="stylesheet" href="/assets/styles.css">
 <script>
   try { var t = localStorage.getItem('ri2-theme');
-    if (localStorage.getItem('ri2-collapsed') === '1') document.documentElement.classList.add('pre-collapsed');
-    if (t === 'dark' || (!t && matchMedia('(prefers-color-scheme: dark)').matches)) document.documentElement.setAttribute('data-theme', 'dark');
+    if (t === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
   } catch (e) { }
 </script>
 </head>
@@ -28,18 +27,18 @@
       <span class="logo-mark"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h7l4 4v12H7z"/><path d="m10 13 2 2 3.5-3.5"/></svg></span>
       <span>Resume Intelligence<small>Demo workspace</small></span>
     </div>
-    <button class="side-search" data-act="palette" aria-label="Search or jump to (Ctrl K)"><i data-icon="search" data-size="15"></i><span>Search or jump to…</span><span class="kbd" id="kbd-k">Ctrl K</span></button>
+    <button class="side-search" data-act="palette" aria-label="Search or jump to (Ctrl K)"><i data-icon="search" data-size="16"></i><span>Search or jump to…</span><span class="kbd" id="kbd-k">Ctrl K</span></button>
     <div class="nav-label">Hiring</div>
     <nav class="nav" id="nav">
-      <a href="#/overview" data-r="overview" data-tip-side="Overview"><i data-icon="overview"></i><span>Overview</span></a>
-      <a href="#/jobs" data-r="jobs" data-tip-side="Job library"><i data-icon="folder"></i><span>Job library</span><span class="tag" id="nav-jobs"></span></a>
-      <a href="#/screen" data-r="screen" data-tip-side="Screen candidates"><i data-icon="users"></i><span>Screen candidates</span><span class="tag" id="nav-screen"></span></a>
-      <a href="#/improve" data-r="improve" data-tip-side="Improve a resume"><i data-icon="wand"></i><span>Improve a resume</span></a>
+      <a href="#/overview" data-r="overview" style="--nc:var(--c-iris)" aria-label="Overview"><span class="nic"><i data-icon="overview" data-size="18"></i></span><span>Overview</span></a>
+      <a href="#/jobs" data-r="jobs" style="--nc:var(--c-blue)" aria-label="Job library"><span class="nic"><i data-icon="folder" data-size="18"></i></span><span>Job library</span><span class="tag" id="nav-jobs"></span></a>
+      <a href="#/screen" data-r="screen" style="--nc:var(--c-teal)" aria-label="Screen candidates"><span class="nic"><i data-icon="users" data-size="18"></i></span><span>Screen candidates</span><span class="tag" id="nav-screen"></span></a>
+      <a href="#/improve" data-r="improve" style="--nc:var(--c-pink)" aria-label="Improve a resume"><span class="nic"><i data-icon="wand" data-size="18"></i></span><span>Improve a resume</span></a>
     </nav>
     <div class="nav-label">Model</div>
     <nav class="nav">
-      <a href="#/model" data-r="model" data-tip-side="Model quality"><i data-icon="shield"></i><span>Model quality</span><span class="tag live" id="nav-model"></span></a>
-      <a href="#/method" data-r="method" data-tip-side="How scoring works"><i data-icon="scale"></i><span>How scoring works</span></a>
+      <a href="#/model" data-r="model" style="--nc:var(--c-green)" aria-label="Model quality"><span class="nic"><i data-icon="shield" data-size="18"></i></span><span>Model quality</span><span class="tag live" id="nav-model"></span></a>
+      <a href="#/method" data-r="method" style="--nc:var(--c-amber)" aria-label="How scoring works"><span class="nic"><i data-icon="scale" data-size="18"></i></span><span>How scoring works</span></a>
     </nav>
     <div class="side-foot">
       <div class="privacy"><i data-icon="lock" data-size="16"></i><div><b>Resumes are never stored</b>They are read in memory and discarded. Only your job library is saved.</div></div>
@@ -47,7 +46,6 @@
         <span class="tiny">v2.2 · fictional data</span>
         <button class="icon-btn" data-act="shortcuts" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts"><i data-icon="keyboard" data-size="17"></i></button>
         <button class="icon-btn" id="theme" title="Switch light / dark" aria-label="Switch theme"><i data-icon="moon"></i></button>
-        <button class="icon-btn collapse-btn" data-act="collapse" title="Collapse sidebar ([)" aria-label="Collapse sidebar"><i data-icon="chevronLeft" data-size="17"></i></button>
       </div>
     </div>
   </aside>
