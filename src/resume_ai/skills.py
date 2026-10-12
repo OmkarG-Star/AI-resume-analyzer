@@ -140,6 +140,45 @@ IMPLIES: dict[str, list[str]] = {
     "Kubernetes": ["Docker"],
 }
 
+# Plain-language descriptions of the work a skill involves. A resume that says
+# "orchestrated DAG-based workflows" is doing what the job means by Airflow, even
+# without naming the tool. These matches are "related" evidence: worth partial
+# credit and a question in the interview, never full credit.
+RELATED: dict[str, list[str]] = {
+    "Airflow": [r"\bdags?\b", r"dag-based", r"orchestrat\w*\s+(?:\w+\s+){0,2}(?:workflows?|pipelines?|jobs|tasks)",
+                r"workflow (?:scheduling|orchestration|scheduler)", r"job schedul\w+"],
+    "ETL": [r"batch jobs?", r"\bingest\w*", r"extract(?:ed|ing)?,? transform", r"data feeds?", r"loading \w+ into"],
+    "Data Warehousing": [r"\bwarehouse\b", r"star-schema", r"fact tables?", r"dimension(?:al)? (?:tables?|models?)",
+                         r"lakehouse", r"data marts?"],
+    "Data Modeling": [r"star-schema", r"dimensional models?", r"schema design", r"designed (?:\w+\s+){0,3}schemas?",
+                      r"data models?\b", r"fact tables?"],
+    "Snowflake": [r"cloud (?:data )?warehouse", r"lakehouse"],
+    "BigQuery": [r"cloud (?:data )?warehouse", r"lakehouse"],
+    "Redshift": [r"cloud (?:data )?warehouse", r"lakehouse"],
+    "dbt": [r"sql transformations?", r"transformation layer", r"modular sql", r"sql models? with tests"],
+    "Kafka": [r"message (?:broker|queue|bus)", r"event stream\w*", r"stream(?:ed|ing)? (?:\w+\s+){0,2}events",
+              r"pub/?sub", r"real-time (?:ingestion|pipelines?|events)"],
+    "Apache Spark": [r"distributed (?:compute|computing|processing|jobs?)", r"cluster computing",
+                     r"compute cluster"],
+    "Data Quality": [r"data (?:checks|tests)", r"validation (?:rules|checks)", r"reconcil\w+",
+                     r"(?:null|duplicate|schema) checks", r"data contracts?"],
+    "CI/CD": [r"automated (?:deploy\w*|tests?|testing|releases?)", r"deployment pipelines?",
+              r"continuous (?:integration|deployment|delivery)"],
+    "Git": [r"pull requests?", r"code reviews?", r"version[- ]controlled", r"branching"],
+    "Machine Learning": [r"predictive models?", r"trained (?:a |an )?(?:\w+\s+){0,2}models?", r"model training"],
+    "Statistics": [r"statistical(?:ly)? significan\w+", r"confidence intervals?", r"p-values?", r"t-tests?",
+                   r"chi-square", r"\banova\b", r"experiment design"],
+    "Classification": [r"predict(?:ed|ing|s)? (?:whether|which|if)\b", r"churn (?:model|prediction)",
+                       r"attrition (?:model|risk)", r"risk scor\w+"],
+    "Regression": [r"predict(?:ed|ing|s)? (?:\w+\s+){0,2}(?:amount|value|price|cost|demand|salary|salaries)"],
+    "Feature Engineering": [r"(?:built|created|derived|designed) (?:\w+\s+){0,2}features", r"feature tables?"],
+    "Model Evaluation": [r"precision", r"recall\b", r"\bauc\b", r"f1[- ]score", r"holdout", r"back-?test\w*"],
+    "Data Visualization": [r"\bcharts?\b", r"visual reports?", r"kpi (?:views|boards?)"],
+    "Docker": [r"containeri[sz]ed"],
+    "REST APIs": [r"\bendpoints?\b", r"served (?:\w+\s+){0,3}(?:behind|via|through) an? api", r"\bapis?\b"],
+}
+RELATED_CREDIT = 0.4
+
 CATEGORY: dict[str, str] = {s: cat for cat, skills in TAXONOMY.items() for s in skills}
 ALL_SKILLS: list[str] = list(CATEGORY)
 
@@ -165,18 +204,45 @@ def _patterns() -> list[tuple[str, re.Pattern]]:
     return out
 
 
-def find_skills(text: str) -> dict[str, int]:
-    """Return {canonical skill: mention count} found in the text."""
+def find_skills(text: str, implied: bool = True) -> dict[str, int]:
+    """Return {canonical skill: mention count} found in the text.
+
+    With implied=False only skills named outright are returned (PostgreSQL,
+    not the SQL it implies).
+    """
     low = text.lower()
     found: dict[str, int] = {}
     for canonical, pat in _patterns():
         n = len(pat.findall(low))
         if n:
             found[canonical] = n
+    if not implied:
+        return found
     for skill in list(found):
         for broader in IMPLIES.get(skill, []):
             found.setdefault(broader, 1)
     return found
+
+
+@lru_cache(maxsize=1)
+def _related_patterns() -> list[tuple[str, re.Pattern]]:
+    return [(skill, re.compile("|".join(f"(?:{p})" for p in pats), re.I)) for skill, pats in RELATED.items()]
+
+
+def find_related(text: str, exclude=()) -> dict[str, str]:
+    """{skill: the phrase that suggests it} for skills described but not named.
+
+    Skills in `exclude` (usually the ones already found by name) are skipped.
+    """
+    out: dict[str, str] = {}
+    skip = set(exclude)
+    for skill, pat in _related_patterns():
+        if skill in skip:
+            continue
+        m = pat.search(text)
+        if m:
+            out[skill] = m.group(0).strip()
+    return out
 
 
 def skill_spans(text: str) -> list[tuple[int, int, str]]:

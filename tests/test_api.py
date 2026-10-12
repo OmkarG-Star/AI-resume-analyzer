@@ -50,3 +50,12 @@ def test_rejects_bad_uploads_and_input():
     assert client.post("/api/parse-file", files={"file": ("a.exe", b"x" * 50, "x")}).status_code == 415
     assert client.post("/api/analyze", json={"resume": "short", "job": "short"}).status_code == 422
     assert client.get("/api/nope").status_code == 404
+
+
+def test_model_card_reports_weights_and_agreement():
+    r = client.get("/api/model").json()
+    assert sum(w["weight"] for w in r["weights"]) == 100
+    ev = r["evaluation"]
+    assert ev["n"] >= 50 and 0 < ev["kappa"] <= 1
+    assert sum(map(sum, ev["confusion"])) == ev["n"]
+    assert r["history"][-1]["version"] == r["version"].rsplit(".", 1)[0]

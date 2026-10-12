@@ -5,6 +5,7 @@ is written to disk or logged. The only thing stored is the company's job
 library (job descriptions plus screening counts), see store.py.
 
   GET  /api/health
+  GET  /api/model                    weights, verdict rules and agreement with the labelled set
   GET  /api/samples                  sample jobs and resumes for the demo
   POST /api/parse-file               extract text from an uploaded PDF/DOCX/TXT
   POST /api/analyze                  one resume vs one job (candidate mode)
@@ -23,6 +24,7 @@ from __future__ import annotations
 import csv
 import io
 import json
+import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -32,7 +34,7 @@ from fastapi.responses import FileResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import __version__, engine, store
+from . import __version__, engine, evaluation, store
 from . import jd as jdmod
 from .parsing import extract_text
 
@@ -60,6 +62,8 @@ def seed_jobs() -> list[dict]:
 @asynccontextmanager
 async def lifespan(_app):
     store.init(seed_jobs())
+    # Score the labelled set in the background so the Model quality page opens instantly.
+    threading.Thread(target=evaluation.model_card, daemon=True).start()
     yield
 
 
@@ -110,6 +114,28 @@ def with_summary(job: dict) -> dict:
 @app.get("/api/health")
 def health():
     return {"status": "ok", "version": __version__}
+
+
+# Accuracy of earlier versions on the same labelled set, for the version history chart.
+MODEL_HISTORY = [
+    {"version": "2.1", "accuracy": 0.767, "kappa": 0.68, "spearman": 0.72, "p_at_3": 0.80, "stuffers_caught": 0},
+]
+
+
+@app.get("/api/model")
+def model():
+    card = evaluation.model_card()
+    return {
+        "version": __version__,
+        "weights": [{"key": k, "label": engine.PART_LABELS[k], "weight": w} for k, w in engine.WEIGHTS.items()],
+        "credits": {"shown": 1.0, "listed": engine.LISTED_ONLY_CREDIT, "related": engine.RELATED_CREDIT},
+        "verdicts": [{"key": k, **v} for k, v in engine.VERDICTS.items()],
+        "integrity": {"penalties": engine.integrity.PENALTY, "cap": engine.integrity.PENALTY_CAP,
+                      "cram_skills": engine.integrity.CRAM_SKILLS, "years_gap": engine.integrity.YEARS_GAP},
+        "evaluation": card,
+        "history": MODEL_HISTORY + ([{"version": __version__.rsplit(".", 1)[0], **{k: card[k] for k in
+                                      ("accuracy", "kappa", "spearman", "p_at_3", "stuffers_caught")}}] if card else []),
+    }
 
 
 @app.get("/api/samples")

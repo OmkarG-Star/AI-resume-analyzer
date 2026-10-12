@@ -13,19 +13,27 @@ Most "resume analyzers" return one similarity percentage. Recruiters cannot act 
 This tool returns **a decision with reasons**: who to shortlist, why, what to check in the interview, and, for candidates,
 exactly which changes raise their score and by how much.
 
-![Recruiter board: candidates sorted into Strong shortlist, Shortlist, Interview to verify and Not a fit](docs/screenshots/board.png)
+![Hiring overview: open roles, session activity, model health and quick actions](docs/screenshots/overview.png)
 
-| Candidate decision | Interview kit |
+| Recruiter board | Insights for the pool |
 |---|---|
-| ![Candidate drawer with verdict, reasons, risks and score breakdown](docs/screenshots/candidate.png) | ![Interview questions generated from the candidate's gaps](docs/screenshots/interview.png) |
-| **Candidate mode** | **Dark theme** |
-| ![Resume coaching with fixes ranked by score gain and a what-if simulator](docs/screenshots/improve.png) | ![Ranked list in dark mode](docs/screenshots/dark.png) |
+| ![Candidates sorted by verdict under a pipeline bar](docs/screenshots/board.png) | ![Score distribution, next steps, must-have coverage and integrity checks](docs/screenshots/insights.png) |
+| **Candidate decision** | **Model quality** |
+| ![Candidate drawer with verdict, reasons, risks and score breakdown](docs/screenshots/candidate.png) | ![Accuracy, kappa, confusion matrix and version history](docs/screenshots/model.png) |
+| **Candidate coaching** | **Ranked list** |
+| ![Resume coaching with fixes ranked by score gain and a what-if simulator](docs/screenshots/improve.png) | ![Candidates ranked by score with verdict and top risk](docs/screenshots/ranked.png) |
 
 *All people, companies and resumes in the demo are fictional.*
 
 ---
 
-## Three workspaces
+## Workspaces
+
+### Overview
+- Open roles, positions to fill, resumes screened and shortlist rate across the job library.
+- **This session**: every screening you run, with its verdict mix. Nothing about candidates is saved.
+- **Model health**: live agreement with the labelled set, so recruiters know how far to trust the verdicts.
+- **Command palette** (`Ctrl K` / `⌘ K`): jump to any page, job or candidate, or run an action. Press `?` for all shortcuts.
 
 ### Company: job library
 - One place for every role the company is hiring for: **create, edit, duplicate, close or delete** job descriptions.
@@ -45,8 +53,10 @@ exactly which changes raise their score and by how much.
 - **Why** and **Risks to check** in plain sentences, plus a 7-part score breakdown.
 - **Interview kit**: questions written from that person's gaps ("Your resume lists Tableau but no project shows it…").
 - **Candidate feedback** you can paste into a reply, whatever the decision.
-- **Board** (Kanban by verdict) or **ranked list**, search, **compare up to 3** side by side, **CSV export**.
-- **Must-have coverage heatmap** across the pool: if nobody has a skill, the requirement may be unrealistic.
+- A **verdict pipeline bar** over three tabs: **Board** (Kanban by verdict), **Ranked list** and **Insights** (keys `1` `2` `3`).
+- **Insights**: score distribution against the verdict thresholds, recommended next steps, must-have coverage (rarest first), integrity flags and the skill heatmap.
+- **Integrity flags** on cards that look written for screening software, with the reasons in the drawer.
+- Step through candidates with `←` `→`, **compare up to 3** side by side, **CSV export**.
 - **Blind screening on by default**: names are replaced by candidate IDs.
 
 ### Candidate: improve a resume
@@ -62,7 +72,7 @@ exactly which changes raise their score and by how much.
 
 | Part | Weight | What it measures |
 |---|---|---|
-| Must-have skills | 38 | Share of required skills found. **Shown in a job/project bullet = full credit; only in a skills list = 70%.** |
+| Must-have skills | 38 | Share of required skills found. **Shown in a job/project bullet = full credit; only in a skills list = 70%; work described without naming the tool = 40%.** |
 | Experience | 14 | Years from dated roles (overlaps merged) vs the job's minimum |
 | Overall relevance | 13 | TF-IDF cosine similarity between resume and job (1–2 grams) |
 | Evidence of impact | 12 | Measurable results, action-verb bullets, skills demonstrated in context |
@@ -73,6 +83,20 @@ exactly which changes raise their score and by how much.
 Parts that don't apply (e.g. no education requirement) are dropped and the rest re-weighted.
 
 **Reading the job.** Skills under *Requirements* are must-haves. Skills under *Nice to have*, or in sentences with "preferred", "bonus" or "a plus", are nice-to-haves. Skills that appear only in the duties count as nice-to-haves when the advert has an explicit requirements list. **"Power BI or Tableau" is one requirement**: either skill satisfies it.
+
+**Described, not named.** "Orchestrated DAG-based workflows" is Airflow-type work, even if the resume never says Airflow. About 20 skills have plain-language patterns like this. A match earns 40% credit, is shown as *Described, not named*, and adds an interview question asking which tool was used. It never counts as full credit.
+
+**Integrity checks.** A keyword scorer is easy to game, so three patterns are caught and explained:
+
+| Pattern | What happens |
+|---|---|
+| Lines copied from the job description | Removed before scoring; −12 points |
+| A bullet naming 6+ required tools at once | Its skills count as listed, not shown; −6 points |
+| Stated years well above the dated roles ("12 years" with 2 years of dates) | Dated years are used; −4 points |
+
+The penalty is capped at 20 points. Copied text or crammed bullets also cap the verdict at *Interview to verify*, so a person looks before deciding.
+
+**Stable scores.** Word weights for the relevance part come from a fixed reference corpus, not from the uploaded batch. The same resume gets the same score whoever else is in the pool.
 
 **Skills.** 96 canonical skills with 259 aliases across 9 categories (sklearn → Scikit-learn, Postgres → PostgreSQL), matched on token boundaries so "excellent" is not "Excel" and "mysql" is not "sql". Specific tools imply broader skills (PostgreSQL → SQL, PyTorch → Deep Learning).
 
@@ -87,7 +111,26 @@ Parts that don't apply (e.g. no education requirement) are dropped and the rest 
 
 **Gains are measured, not guessed.** Each suggestion's "+points" comes from re-scoring the resume with that one fix applied.
 
+## How accurate is it?
+
+This is a transparent rule-based scorer, not a model trained on hiring outcomes, so accuracy is measured against human labels. The set in [`eval/`](eval/) has 60 labelled resume–job pairs, including keyword stuffers, people who describe their work without naming tools, career changers and inflated claims:
+
+| Metric | v2.1 | v2.2 |
+|---|---|---|
+| Verdict accuracy (shortlist / maybe / reject) | 76.7% | **80.0%** |
+| Cohen's kappa (linear-weighted) | 0.68 | **0.77** |
+| Spearman rho, score vs label | 0.72 | **0.84** |
+| Precision@3 per job | 80% | **100%** |
+| Keyword stuffers kept off the shortlist | 0 of 3 | **3 of 3** |
+| Good candidates wrongly rejected | 1 of 26 | 1 of 26 |
+
+The resumes are fictional and the labels are the author's, so treat these figures as a regression baseline, not a real-world accuracy claim. [`eval/README.md`](eval/README.md) explains how to measure it properly with recruiter labels. The main known weakness is that years are counted from every dated role, including roles outside data work, so career changers can look more experienced than they are.
+
 ---
+
+### Model quality
+- Verdict accuracy, weighted kappa, Spearman, precision@3, stuffers caught and false rejections, each against the previous version.
+- Confusion matrix, score weights, integrity rules and every disagreement with the labels, served live from `GET /api/model`.
 
 ## Responsible use
 
@@ -101,20 +144,23 @@ Parts that don't apply (e.g. no education requirement) are dropped and the rest 
 ## Architecture
 
 ```
-frontend/            single-page app: vanilla JS, hand-built SVG, no framework or CDN
+frontend/            single-page app: vanilla JS, hand-built SVG charts, no framework or CDN
   index.html
-  assets/app.js      routing, views, drawer, compare, what-if, uploads
+  assets/app.js      routing, overview, board/insights, model quality, drawer, palette, what-if, uploads
   assets/styles.css  design tokens (light/dark), components, motion
   assets/icons.js    outline icon set drawn for this project (MIT)
 src/resume_ai/
   parsing.py         PDF/DOCX/TXT extraction, sections, years, education, PII masking
-  skills.py          taxonomy, aliases, implications, span matching
+  skills.py          taxonomy, aliases, implications, plain-language "related" phrases, span matching
+  integrity.py       copied job text, crammed bullets, inflated years claims
   jd.py              must-have / nice-to-have split, either-or groups, years, education, seniority
   engine.py          features, 7-part score, verdicts, reasons, questions, suggestions, rewrites
+  evaluation.py      agreement with the labelled set (CLI and /api/model)
   store.py           job library: SQLite CRUD for job descriptions and screening counts
   api.py             FastAPI: analyze, screen, export, parse-file, /api/jobs CRUD
 samples/             job descriptions, seed job library and 6 fictional resumes
-tests/               31 pytest tests (parsing, skills, JD, engine, API, job library)
+eval/                labelled resume-job pairs and evaluate.py (accuracy, kappa, Spearman)
+tests/               39 pytest tests (parsing, skills, JD, engine, integrity, API, job library, eval baseline)
 legacy/              the original Streamlit + TF-IDF version, kept for comparison
 ```
 
@@ -133,6 +179,7 @@ Tests:
 ```bash
 pip install pytest httpx reportlab
 python -m pytest -q
+python eval/evaluate.py   # agreement with the labelled set
 ```
 
 Docker:
@@ -158,6 +205,7 @@ curl -X POST localhost:8000/api/analyze -H 'content-type: application/json' \
 | `POST /api/screen/export` | The ranked shortlist as CSV |
 | `POST /api/parse-file` | Extract text from a PDF, DOCX or TXT upload |
 | `GET /api/samples` | Demo job descriptions and resumes |
+| `GET /api/model` | Weights, verdict rules, integrity rules and agreement with the labelled set |
 | `GET /api/jobs` · `POST /api/jobs` | List the job library (with parsed requirements) · add a job |
 | `GET / PUT / DELETE /api/jobs/{id}` | Read, edit or remove a job |
 | `POST /api/jobs/{id}/duplicate` | Copy a job as an On hold draft |
@@ -169,6 +217,7 @@ The library lives in SQLite at `JOBS_DB` (default `data/jobs.db`) and is seeded 
 
 ## Version history
 
+- **v2.2**: integrity checks against keyword stuffing, partial credit for work described without tool names, batch-independent scores, and an evaluation set with accuracy metrics. New console UI in a bright light theme: an icon-rail sidebar that expands on hover, colour-coded workspaces, overview dashboard, insights tab, model quality page, command palette, keyboard shortcuts and a staged screening run.
 - **v2.1**: company job library: saved job descriptions with status, team and openings, live requirement preview, one-click screening and per-job counts.
 - **v2.0**: rebuilt as a two-sided product: structured job parsing, evidence-weighted scoring, verdicts with reasons, interview kit, candidate coaching with measured gains, premium web UI, tests and CI.
 - **v1.0** (`legacy/`): Streamlit app with TF-IDF cosine similarity and a fixed 28-skill list.

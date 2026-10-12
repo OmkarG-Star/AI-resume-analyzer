@@ -1,0 +1,20 @@
+Pooja Shinde
+pooja.shinde@example.com | +91 97654 32100
+
+Summary
+Junior data engineer.
+
+Experience
+Junior Data Engineer — Alpine Ski House | Jul 2025 – Present
+- Built Airflow DAGs that load 15 source tables into Snowflake every night
+- Wrote dbt models with tests for 8 finance marts
+- Fixed failing SQL and Python jobs, cutting reruns by 40%
+
+Projects
+- Weather data pipeline with Python, Airflow and PostgreSQL, deployed with Docker
+
+Skills
+Python, SQL, Airflow, dbt, Snowflake, PostgreSQL, Git, Docker
+
+Education
+B.Tech Computer Science, 2025

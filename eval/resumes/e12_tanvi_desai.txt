@@ -1,0 +1,19 @@
+Tanvi Desai
+tanvi.desai@example.com | +91 97300 66778
+
+Summary
+Analytics engineer building trusted data models.
+
+Experience
+Analytics Engineer — Northwind Finance | Jan 2023 – Present
+- Modelled finance data into 25 star-schema marts with dbt on Snowflake, with tests on every model
+- Defined 40 shared metrics in Looker used across 6 teams
+- Wrote Python scripts to load vendor files, cutting manual work by 10 hours a week
+BI Developer — Northwind Finance | Jun 2021 – Dec 2022
+- Built SQL views and Power BI reports for monthly close
+
+Skills
+SQL, dbt, Snowflake, Data Modeling, Looker, Power BI, Python, Git
+
+Education
+B.E. Electronics, 2021

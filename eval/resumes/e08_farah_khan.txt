@@ -1,0 +1,20 @@
+Farah Khan
+farah.khan@example.com | +91 98190 55443
+
+Summary
+Senior data scientist in people analytics.
+
+Experience
+Lead Data Scientist — Contoso People Analytics | Apr 2021 – Present
+- Built attrition classification and salary regression models in Python with Scikit-learn and XGBoost for 25,000 employees
+- Engineered 60 features from HRMS and survey data; evaluated models with cross-validation and AUC
+- Explained predictions with SHAP in Tableau dashboards for 30 HR partners
+- Ran A/B tests on manager nudges and cut early attrition by 9%
+Data Analyst — Contoso | Jun 2019 – Mar 2021
+- Wrote SQL and Pandas pipelines with NumPy for weekly HR analytics reports
+
+Skills
+Python, SQL, Pandas, NumPy, Scikit-learn, XGBoost, SHAP, Statistics, Tableau, Feature Engineering, Model Evaluation, HR Analytics, Git
+
+Education
+M.Sc. Data Science, 2019

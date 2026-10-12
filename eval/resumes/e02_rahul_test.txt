@@ -1,0 +1,20 @@
+Rahul Kumar
+rahul.k@example.com | +91 90909 80808
+
+Summary
+15 years of experience in data engineering.
+
+Experience
+Data Engineer — Freelance | Jan 2025 – Present
+- Built ETL, SQL, Airflow, Snowflake, BigQuery, Redshift, dbt, Data Modeling, Data Quality, Git, CI/CD and Python pipelines
+- Design and maintain ETL pipelines that ingest data from APIs and operational databases
+- Model data in our warehouse (Snowflake) using dbt
+- Orchestrate workflows with Airflow and ensure data quality with automated tests
+- Partner with analysts and data scientists to deliver trusted datasets
+- Experience with Airflow, dbt and a cloud data warehouse (Snowflake, BigQuery or Redshift)
+
+Skills
+ETL, SQL, Airflow, Snowflake, BigQuery, Redshift, dbt, Data Modeling, Data Quality, Data Warehousing, Git, CI/CD, Python, Spark, Kafka, Docker, Terraform, AWS
+
+Education
+B.Sc., 2023

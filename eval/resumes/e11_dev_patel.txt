@@ -1,0 +1,17 @@
+Dev Patel
+dev.patel@example.com | +91 98250 11122
+
+Summary
+Backend engineer with 5 years of experience building APIs.
+
+Experience
+Backend Engineer — Trey Research | Aug 2021 – Present
+- Built Go and Java microservices serving 5 million requests a day on Kubernetes
+- Designed PostgreSQL schemas and REST APIs for billing
+- Set up CI/CD with Jenkins and Terraform on AWS
+
+Skills
+Go, Java, PostgreSQL, Kubernetes, Docker, Terraform, AWS, Git, CI/CD, REST APIs
+
+Education
+B.Tech Computer Science, 2021

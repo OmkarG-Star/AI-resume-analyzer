@@ -1,0 +1,20 @@
+Aditya Kulkarni
+aditya.k@example.com | +91 98450 67890
+
+Summary
+Machine learning engineer focused on production systems.
+
+Experience
+ML Engineer — Relecloud | Jan 2022 – Present
+- Deployed PyTorch ranking models as FastAPI services in Docker on Kubernetes, p95 latency 40 ms
+- Built training pipelines with MLflow experiment tracking and automated evaluation
+- Set up CI/CD with GitHub Actions for 12 model services
+- Monitored drift and led retraining that recovered 4% of click-through
+Data Scientist — Relecloud | Jun 2020 – Dec 2021
+- Built Scikit-learn demand forecasting models in Python and SQL
+
+Skills
+Python, SQL, PyTorch, Scikit-learn, FastAPI, Docker, Kubernetes, MLflow, Git, AWS, Spark
+
+Education
+B.Tech Computer Science, 2020

@@ -8,7 +8,10 @@ with fixed weights so every number on screen can be explained:
     text similarity 13 · evidence 12 · resume quality 8
 
 A skill that only sits in a skills list counts for 70% of one that is shown in
-an experience or project bullet. Recruiter mode turns the score and knockouts
+an experience or project bullet; work described in plain language without the
+tool's name ("orchestrated DAG workflows" for Airflow) counts for 40%. Lines
+copied from the job and bullets that cram in every required tool are caught by
+integrity.py and cost points. Recruiter mode turns the score and knockouts
 into a verdict with reasons, risks and interview questions. Candidate mode
 turns the gaps into fixes, each with the score gain it is expected to bring,
 worked out by re-scoring the resume with that fix applied.
@@ -17,13 +20,16 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field, replace
+from functools import lru_cache
+from pathlib import Path
 
 from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS, TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
+from . import integrity
 from . import jd as jdmod
 from .parsing import Profile, mask_pii, profile
-from .skills import CATEGORY, by_category, find_skills
+from .skills import CATEGORY, RELATED_CREDIT, by_category, find_related, find_skills
 
 WEIGHTS = {"must": 38, "nice": 10, "experience": 14, "education": 5,
            "similarity": 13, "evidence": 12, "quality": 8}
@@ -80,6 +86,7 @@ class Features:
     has_phone: bool
     similarity: float
     extra: set[str] = field(default_factory=set)      # what-if: skills the candidate confirms they have
+    related: dict[str, str] = field(default_factory=dict)  # skill -> phrase describing it without naming it
 
 
 def _first_word(line: str) -> str:
@@ -87,12 +94,18 @@ def _first_word(line: str) -> str:
     return m.group(0).lower() if m else ""
 
 
-def features_from(p: Profile, similarity: float) -> Features:
+def features_from(p: Profile, similarity: float, crammed: list[str] | None = None) -> Features:
     work_text = "\n".join(p.sections.get(k, "") for k in ("experience", "projects", "summary", "achievements"))
     if not work_text.strip():
         work_text = "\n".join(v for k, v in p.sections.items() if k != "skills")
+    if crammed:
+        # A bullet that names every required tool proves none of them.
+        bad = set(crammed)
+        work_text = "\n".join(l for l in work_text.split("\n")
+                               if not any(b in l for b in bad))
     found = find_skills(p.text)
     demonstrated = set(find_skills(work_text))
+    related = find_related(work_text, exclude=found)
     quant = [b for b in p.bullets if QUANT_RE.search(b)]
     action = [b for b in p.bullets if _first_word(b) in ACTION_VERBS]
     weak = [b for b in p.bullets if WEAK_PHRASES.search(b) or (not QUANT_RE.search(b) and _first_word(b) not in ACTION_VERBS)]
@@ -100,11 +113,29 @@ def features_from(p: Profile, similarity: float) -> Features:
                     education_level=p.education_level, education_label=p.education_label,
                     n_bullets=len(p.bullets), n_quant=len(quant), n_action=len(action),
                     weak_bullets=weak, sections=set(p.sections), word_count=p.word_count,
-                    has_email=p.has_email, has_phone=p.has_phone, similarity=similarity)
+                    has_email=p.has_email, has_phone=p.has_phone, similarity=similarity,
+                    related=related)
 
 
-def similarity(resume: str, jd_text: str, corpus: list[str] | None = None) -> float:
-    docs = [jd_text, resume] + [d for d in (corpus or []) if d not in (jd_text, resume)]
+REFERENCE_DIR = Path(__file__).resolve().parents[2] / "samples"
+
+
+@lru_cache(maxsize=1)
+def reference_corpus() -> tuple[str, ...]:
+    """Fixed background documents for TF-IDF weighting.
+
+    Word weights used to be learned from whichever resumes were uploaded
+    together, so the same resume scored differently depending on the rest of
+    the batch. A fixed corpus makes each resume-job score independent of who
+    else is in the pool.
+    """
+    if not REFERENCE_DIR.exists():
+        return ()
+    return tuple(p.read_text(encoding="utf-8") for p in sorted(REFERENCE_DIR.rglob("*.txt")))
+
+
+def similarity(resume: str, jd_text: str) -> float:
+    docs = [jd_text, resume] + [d for d in reference_corpus() if d not in (jd_text, resume)]
     vec = TfidfVectorizer(stop_words="english", ngram_range=(1, 2), sublinear_tf=True, min_df=1)
     m = vec.fit_transform(docs)
     return float(cosine_similarity(m[0:1], m[1:2])[0][0])
@@ -116,6 +147,8 @@ def _skill_credit(skill: str, f: Features) -> float:
         return 1.0
     if skill in f.found:
         return LISTED_ONLY_CREDIT
+    if skill in f.related:
+        return RELATED_CREDIT
     return 0.0
 
 
@@ -198,11 +231,15 @@ def quality_checks(f: Features) -> list[dict]:
 
 # ------------------------------------------------------------------ analysis
 def _status(s: str, f: Features) -> str:
-    return "shown" if s in f.demonstrated or s in f.extra else "listed" if s in f.found else "missing"
+    if s in f.demonstrated or s in f.extra:
+        return "shown"
+    if s in f.found:
+        return "listed"
+    return "related" if s in f.related else "missing"
 
 
 def _skill_table(spec: jdmod.JobSpec, f: Features) -> list[dict]:
-    rank = {"shown": 0, "listed": 1, "missing": 2}
+    rank = {"shown": 0, "listed": 1, "related": 2, "missing": 3}
     rows = []
     for importance, group in units(spec):
         statuses = {s: _status(s, f) for s in group}
@@ -210,21 +247,29 @@ def _skill_table(spec: jdmod.JobSpec, f: Features) -> list[dict]:
         label = " or ".join(group) if len(group) > 1 else group[0]
         rows.append({"skill": label, "members": group, "matched": best if statuses[best] != "missing" else None,
                      "category": CATEGORY.get(group[0], "Other"), "importance": importance,
-                     "status": statuses[best]})
+                     "status": statuses[best],
+                     "evidence": f.related.get(best) if statuses[best] == "related" else None})
     return rows
 
 
-def _verdict(score: float, parts: dict, table: list[dict]) -> tuple[str, list[str]]:
+def _verdict(score: float, parts: dict, table: list[dict],
+             integ: integrity.Integrity | None = None) -> tuple[str, list[str]]:
     must = [r for r in table if r["importance"] == "must"]
     missing = [r["skill"] for r in must if r["status"] == "missing"]
-    miss_ratio = len(missing) / len(must) if must else 0.0
+    related = [r["skill"] for r in must if r["status"] == "related"]
+    # Work described without the tool's name is half-way between having and missing it.
+    miss_ratio = (len(missing) + 0.5 * len(related)) / len(must) if must else 0.0
     knockouts = []
+    if integ is not None and integ.suspicious:
+        knockouts.append("Possible keyword stuffing: check the resume yourself")
     if must and miss_ratio > 0.5:
         knockouts.append(f"Missing {len(missing)} of {len(must)} must-have skills")
     if parts["experience"] < 0.45:
         knockouts.append("Well short of the required experience")
     if knockouts and (miss_ratio > 0.5 or score < 55):
         return "reject", knockouts
+    if integ is not None and integ.suspicious:
+        return ("verify" if score >= 48 else "reject"), knockouts
     if score >= 74 and miss_ratio <= 0.3 and parts["experience"] >= 0.8:
         return "strong", knockouts
     if score >= 62 and miss_ratio <= 0.34:
@@ -267,6 +312,10 @@ def _strengths_risks(spec, f, parts, table, p) -> tuple[list[str], list[str]]:
         risks.append("Missing must-haves: " + ", ".join(missing_must[:6]))
     if listed_must:
         risks.append("Listed but not shown in any project or job: " + ", ".join(listed_must[:5]))
+    related_must = [r for r in table if r["importance"] == "must" and r["status"] == "related"]
+    if related_must:
+        risks.append("Described but not named, so confirm the tool: "
+                     + ", ".join(f"{r['skill']} (\"{r['evidence']}\")" for r in related_must[:4]))
     if spec.min_years:
         if f.years is None:
             risks.append("Could not find dated roles, so experience is unverified")
@@ -287,6 +336,11 @@ def _questions(spec, f, table) -> list[dict]:
             qs.append({"topic": r["skill"], "why": "Must-have skill not found",
                        "question": f"This role uses {r['skill']} daily. What have you used that is closest to it, "
                                    f"and how quickly could you get productive with {r['skill']}?"})
+    for r in table:
+        if r["importance"] == "must" and r["status"] == "related" and len(qs) < 3:
+            qs.append({"topic": r["skill"], "why": "Related work, tool not named",
+                       "question": f"You describe \"{r['evidence']}\". Which tools did you use for that, "
+                                   f"and how much have you worked with {r['skill']} itself?"})
     for r in table:
         if r["status"] == "listed" and len(qs) < 4:
             qs.append({"topic": r["skill"], "why": "Listed without evidence",
@@ -405,6 +459,16 @@ def _suggestions(spec, f, parts, table, p, base_score) -> list[dict]:
                     "detail": "These skills only appear in your skills list. Recruiters and screening software trust a skill "
                               "far more when a bullet shows it in use, for example \"Automated weekly MIS in Python, "
                               "cutting prep time from 6 hours to 40 minutes\"."})
+    related = [r for r in table if r["status"] == "related"]
+    if related:
+        names = [r["matched"] for r in related]
+        gain = gain_with(demonstrated=f.demonstrated | set(names))
+        examples = "; ".join(f"\"{r['evidence']}\" reads like {r['matched']}" for r in related[:2])
+        out.append({"kind": "name_tools", "gain": gain, "skills": names,
+                    "title": f"Name the tools behind your work: {', '.join(names[:3])}{'…' if len(names) > 3 else ''}",
+                    "detail": f"You describe this work without naming the tool ({examples}). If you used "
+                              "these tools, name them in the bullet. Screening software and recruiters search "
+                              "for tool names."})
     if f.n_quant < 3 and f.n_bullets:
         target = min(f.n_bullets, max(3, f.n_quant + 3))
         gain = gain_with(n_quant=target)
@@ -437,24 +501,30 @@ def _suggestions(spec, f, parts, table, p, base_score) -> list[dict]:
     return out
 
 
-def analyze(resume_text: str, jd_text: str, *, corpus: list[str] | None = None,
-            assume_skills: list[str] | None = None, spec: jdmod.JobSpec | None = None) -> dict:
+def analyze(resume_text: str, jd_text: str, *, assume_skills: list[str] | None = None,
+            spec: jdmod.JobSpec | None = None) -> dict:
     spec = spec or jdmod.parse(jd_text)
-    p = profile(resume_text)
-    f = features_from(p, similarity(p.text, spec.text, corpus))
+    jd_skills = set(spec.required) | set(spec.preferred)
+    copied = integrity.copied_lines(resume_text, spec.text)
+    clean_text = integrity.strip_lines(resume_text, copied) if copied else resume_text
+    p = profile(clean_text)
+    integ = integrity.check(copied, p.bullets, jd_skills, p.stated_years, p.dated_years)
+    f = features_from(p, similarity(p.text, spec.text), integ.crammed_bullets)
     if assume_skills:
         f.extra = set(assume_skills)
     parts = score_parts(f, spec)
-    score = overall(parts)
+    raw_score = overall(parts)
+    score = round(max(0.0, raw_score - integ.penalty), 1)
     table = _skill_table(spec, f)
-    verdict_key, knockouts = _verdict(score, parts, table)
+    verdict_key, knockouts = _verdict(score, parts, table, integ)
     strengths, risks = _strengths_risks(spec, f, parts, table, p)
+    risks = [f"Integrity: {flag}" for flag in integ.flags] + risks
     conf, conf_note = _confidence(p)
     resume_skills = sorted(set(f.found) | f.extra)
-    jd_skills = set(spec.required) | set(spec.preferred)
 
     return {
         "score": score,
+        "integrity": integ.as_dict(),
         "verdict": {"key": verdict_key, **VERDICTS[verdict_key], "knockouts": knockouts},
         "confidence": {"level": conf, "note": conf_note},
         "parts": [{"key": k, "label": PART_LABELS[k], "weight": WEIGHTS[k],
@@ -462,8 +532,9 @@ def analyze(resume_text: str, jd_text: str, *, corpus: list[str] | None = None,
         "skills": table,
         "summary": {
             "must_total": len(spec.required), "nice_total": len(spec.preferred),
-            "must_matched": sum(1 for r in table if r["importance"] == "must" and r["status"] != "missing"),
-            "nice_matched": sum(1 for r in table if r["importance"] == "nice" and r["status"] != "missing"),
+            "must_matched": sum(1 for r in table if r["importance"] == "must" and r["status"] in ("shown", "listed")),
+            "must_related": sum(1 for r in table if r["importance"] == "must" and r["status"] == "related"),
+            "nice_matched": sum(1 for r in table if r["importance"] == "nice" and r["status"] in ("shown", "listed")),
             "years": f.years, "education": f.education_label, "word_count": f.word_count,
             "bullets": f.n_bullets, "quantified": f.n_quant, "similarity": round(f.similarity, 3),
         },
@@ -471,7 +542,8 @@ def analyze(resume_text: str, jd_text: str, *, corpus: list[str] | None = None,
         "strengths": strengths,
         "risks": risks,
         "questions": _questions(spec, f, table),
-        "suggestions": _suggestions(spec, f, parts, table, p, score),
+        # Gains are measured against the score before the integrity penalty, which no edit to skills removes.
+        "suggestions": _suggestions(spec, f, parts, table, p, raw_score),
         "rewrites": [{"before": mask_pii(b), "after": rewrite(b)} for b in f.weak_bullets[:4]],
         "keywords": _keyword_gaps(spec.text, p.text),
         "ats": quality_checks(f),
@@ -490,10 +562,9 @@ def job_summary(spec: jdmod.JobSpec) -> dict:
 def screen(jd_text: str, resumes: list[tuple[str, str]]) -> dict:
     """Rank many resumes against one job. resumes = [(file name, text), ...]"""
     spec = jdmod.parse(jd_text)
-    texts = [t for _, t in resumes]
     results = []
     for i, (fname, text) in enumerate(resumes, start=1):
-        r = analyze(text, jd_text, corpus=texts, spec=spec)
+        r = analyze(text, jd_text, spec=spec)
         r["id"] = f"C{i:02d}"
         r["label"] = f"Candidate {i:02d}"
         r["file"] = fname
@@ -505,6 +576,6 @@ def screen(jd_text: str, resumes: list[tuple[str, str]]) -> dict:
     counts = {k: sum(1 for r in results if r["verdict"]["key"] == k) for k in order}
     must_units = [" or ".join(g) for imp, g in units(spec) if imp == "must"]
     must_cov = {s: sum(1 for r in results for row in r["skills"]
-                       if row["skill"] == s and row["status"] != "missing") for s in must_units}
+                       if row["skill"] == s and row["status"] in ("shown", "listed")) for s in must_units}
     return {"job": job_summary(spec), "candidates": results, "counts": counts,
             "skill_coverage": [{"skill": s, "have": n, "of": len(results)} for s, n in must_cov.items()]}
