@@ -13,19 +13,27 @@ Most "resume analyzers" return one similarity percentage. Recruiters cannot act 
 This tool returns **a decision with reasons**: who to shortlist, why, what to check in the interview, and, for candidates,
 exactly which changes raise their score and by how much.
 
-![Recruiter board: candidates sorted into Strong shortlist, Shortlist, Interview to verify and Not a fit](docs/screenshots/board.png)
+![Hiring overview: open roles, session activity, model health and quick actions](docs/screenshots/overview.png)
 
-| Candidate decision | Interview kit |
+| Recruiter board | Insights for the pool |
 |---|---|
-| ![Candidate drawer with verdict, reasons, risks and score breakdown](docs/screenshots/candidate.png) | ![Interview questions generated from the candidate's gaps](docs/screenshots/interview.png) |
-| **Candidate mode** | **Dark theme** |
+| ![Candidates sorted by verdict under a pipeline bar](docs/screenshots/board.png) | ![Score distribution, next steps, must-have coverage and integrity checks](docs/screenshots/insights.png) |
+| **Candidate decision** | **Model quality** |
+| ![Candidate drawer with verdict, reasons, risks and score breakdown](docs/screenshots/candidate.png) | ![Accuracy, kappa, confusion matrix and version history](docs/screenshots/model.png) |
+| **Candidate coaching** | **Command palette and dark theme** |
 | ![Resume coaching with fixes ranked by score gain and a what-if simulator](docs/screenshots/improve.png) | ![Ranked list in dark mode](docs/screenshots/dark.png) |
 
 *All people, companies and resumes in the demo are fictional.*
 
 ---
 
-## Three workspaces
+## Workspaces
+
+### Overview
+- Open roles, positions to fill, resumes screened and shortlist rate across the job library.
+- **This session**: every screening you run, with its verdict mix. Nothing about candidates is saved.
+- **Model health**: live agreement with the labelled set, so recruiters know how far to trust the verdicts.
+- **Command palette** (`Ctrl K` / `⌘ K`): jump to any page, job or candidate, or run an action. Press `?` for all shortcuts.
 
 ### Company: job library
 - One place for every role the company is hiring for: **create, edit, duplicate, close or delete** job descriptions.
@@ -45,8 +53,10 @@ exactly which changes raise their score and by how much.
 - **Why** and **Risks to check** in plain sentences, plus a 7-part score breakdown.
 - **Interview kit**: questions written from that person's gaps ("Your resume lists Tableau but no project shows it…").
 - **Candidate feedback** you can paste into a reply, whatever the decision.
-- **Board** (Kanban by verdict) or **ranked list**, search, **compare up to 3** side by side, **CSV export**.
-- **Must-have coverage heatmap** across the pool: if nobody has a skill, the requirement may be unrealistic.
+- A **verdict pipeline bar** over three tabs: **Board** (Kanban by verdict), **Ranked list** and **Insights** (keys `1` `2` `3`).
+- **Insights**: score distribution against the verdict thresholds, recommended next steps, must-have coverage (rarest first), integrity flags and the skill heatmap.
+- **Integrity flags** on cards that look written for screening software, with the reasons in the drawer.
+- Step through candidates with `←` `→`, **compare up to 3** side by side, **CSV export**.
 - **Blind screening on by default**: names are replaced by candidate IDs.
 
 ### Candidate: improve a resume
@@ -118,6 +128,10 @@ The resumes are fictional and the labels are the author's, so treat these figure
 
 ---
 
+### Model quality
+- Verdict accuracy, weighted kappa, Spearman, precision@3, stuffers caught and false rejections, each against the previous version.
+- Confusion matrix, score weights, integrity rules and every disagreement with the labels, served live from `GET /api/model`.
+
 ## Responsible use
 
 - **Decision support, not a decision.** Keyword-based scoring misses career changers, unusual titles and context. A person should review every rejection.
@@ -130,9 +144,9 @@ The resumes are fictional and the labels are the author's, so treat these figure
 ## Architecture
 
 ```
-frontend/            single-page app: vanilla JS, hand-built SVG, no framework or CDN
+frontend/            single-page app: vanilla JS, hand-built SVG charts, no framework or CDN
   index.html
-  assets/app.js      routing, views, drawer, compare, what-if, uploads
+  assets/app.js      routing, overview, board/insights, model quality, drawer, palette, what-if, uploads
   assets/styles.css  design tokens (light/dark), components, motion
   assets/icons.js    outline icon set drawn for this project (MIT)
 src/resume_ai/
@@ -141,11 +155,12 @@ src/resume_ai/
   integrity.py       copied job text, crammed bullets, inflated years claims
   jd.py              must-have / nice-to-have split, either-or groups, years, education, seniority
   engine.py          features, 7-part score, verdicts, reasons, questions, suggestions, rewrites
+  evaluation.py      agreement with the labelled set (CLI and /api/model)
   store.py           job library: SQLite CRUD for job descriptions and screening counts
   api.py             FastAPI: analyze, screen, export, parse-file, /api/jobs CRUD
 samples/             job descriptions, seed job library and 6 fictional resumes
 eval/                labelled resume-job pairs and evaluate.py (accuracy, kappa, Spearman)
-tests/               38 pytest tests (parsing, skills, JD, engine, integrity, API, job library, eval baseline)
+tests/               39 pytest tests (parsing, skills, JD, engine, integrity, API, job library, eval baseline)
 legacy/              the original Streamlit + TF-IDF version, kept for comparison
 ```
 
@@ -190,6 +205,7 @@ curl -X POST localhost:8000/api/analyze -H 'content-type: application/json' \
 | `POST /api/screen/export` | The ranked shortlist as CSV |
 | `POST /api/parse-file` | Extract text from a PDF, DOCX or TXT upload |
 | `GET /api/samples` | Demo job descriptions and resumes |
+| `GET /api/model` | Weights, verdict rules, integrity rules and agreement with the labelled set |
 | `GET /api/jobs` · `POST /api/jobs` | List the job library (with parsed requirements) · add a job |
 | `GET / PUT / DELETE /api/jobs/{id}` | Read, edit or remove a job |
 | `POST /api/jobs/{id}/duplicate` | Copy a job as an On hold draft |
@@ -201,7 +217,7 @@ The library lives in SQLite at `JOBS_DB` (default `data/jobs.db`) and is seeded 
 
 ## Version history
 
-- **v2.2**: integrity checks against keyword stuffing, partial credit for work described without tool names, batch-independent scores, and an evaluation set with accuracy metrics.
+- **v2.2**: integrity checks against keyword stuffing, partial credit for work described without tool names, batch-independent scores, and an evaluation set with accuracy metrics. New console UI: overview dashboard, insights tab, model quality page, command palette, keyboard shortcuts, collapsible sidebar and a staged screening run.
 - **v2.1**: company job library: saved job descriptions with status, team and openings, live requirement preview, one-click screening and per-job counts.
 - **v2.0**: rebuilt as a two-sided product: structured job parsing, evidence-weighted scoring, verdicts with reasons, interview kit, candidate coaching with measured gains, premium web UI, tests and CI.
 - **v1.0** (`legacy/`): Streamlit app with TF-IDF cosine similarity and a fixed 28-skill list.

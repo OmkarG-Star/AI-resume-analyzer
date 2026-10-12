@@ -1,5 +1,4 @@
 import glob
-import sys
 
 from conftest import SAMPLES
 from resume_ai import engine
@@ -65,9 +64,8 @@ def test_score_does_not_depend_on_the_rest_of_the_batch():
 
 def test_evaluation_set_stays_above_baseline():
     """Guard against regressions on the labelled set in eval/."""
-    sys.path.insert(0, str(ROOT / "eval"))
-    import evaluate
-    m = evaluate.run(ROOT / "src")
+    from resume_ai import evaluation
+    m = evaluation.run()
     assert m["kappa"] >= 0.70
     assert m["spearman"] >= 0.75
     assert m["stuffers_caught"] == m["stuffers"]

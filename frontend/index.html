@@ -12,36 +12,42 @@
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%236E56CF'/><stop offset='1' stop-color='%233E63DD'/></linearGradient></defs><rect width='32' height='32' rx='9' fill='url(%23g)'/><path d='M10 9h8l4 4v10H10z' fill='none' stroke='white' stroke-width='2' stroke-linejoin='round'/><path d='m13 17 2.5 2.5L20 15' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/assets/styles.css">
 <script>
   try { var t = localStorage.getItem('ri2-theme');
+    if (localStorage.getItem('ri2-collapsed') === '1') document.documentElement.classList.add('pre-collapsed');
     if (t === 'dark' || (!t && matchMedia('(prefers-color-scheme: dark)').matches)) document.documentElement.setAttribute('data-theme', 'dark');
   } catch (e) { }
 </script>
 </head>
 <body>
 <div class="shell" id="shell">
-  <aside class="side">
+  <aside class="side" aria-label="Main navigation">
     <div class="logo">
       <span class="logo-mark"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h7l4 4v12H7z"/><path d="m10 13 2 2 3.5-3.5"/></svg></span>
-      <span>Resume Intelligence<small>Hiring decisions with reasons</small></span>
+      <span>Resume Intelligence<small>Demo workspace</small></span>
     </div>
-    <div class="nav-label">Workspace</div>
+    <button class="side-search" data-act="palette" aria-label="Search or jump to (Ctrl K)"><i data-icon="search" data-size="15"></i><span>Search or jump to…</span><span class="kbd" id="kbd-k">Ctrl K</span></button>
+    <div class="nav-label">Hiring</div>
     <nav class="nav" id="nav">
-      <a href="#/jobs" data-r="jobs"><i data-icon="folder"></i>Job library<span class="tag">Company</span></a>
-      <a href="#/screen" data-r="screen"><i data-icon="users"></i>Screen candidates<span class="tag">Recruiter</span></a>
-      <a href="#/improve" data-r="improve"><i data-icon="wand"></i>Improve a resume<span class="tag">Candidate</span></a>
+      <a href="#/overview" data-r="overview" data-tip-side="Overview"><i data-icon="overview"></i><span>Overview</span></a>
+      <a href="#/jobs" data-r="jobs" data-tip-side="Job library"><i data-icon="folder"></i><span>Job library</span><span class="tag" id="nav-jobs"></span></a>
+      <a href="#/screen" data-r="screen" data-tip-side="Screen candidates"><i data-icon="users"></i><span>Screen candidates</span><span class="tag" id="nav-screen"></span></a>
+      <a href="#/improve" data-r="improve" data-tip-side="Improve a resume"><i data-icon="wand"></i><span>Improve a resume</span></a>
     </nav>
-    <div class="nav-label">Learn</div>
+    <div class="nav-label">Model</div>
     <nav class="nav">
-      <a href="#/method" data-r="method"><i data-icon="scale"></i>How scoring works</a>
+      <a href="#/model" data-r="model" data-tip-side="Model quality"><i data-icon="shield"></i><span>Model quality</span><span class="tag live" id="nav-model"></span></a>
+      <a href="#/method" data-r="method" data-tip-side="How scoring works"><i data-icon="scale"></i><span>How scoring works</span></a>
     </nav>
     <div class="side-foot">
       <div class="privacy"><i data-icon="lock" data-size="16"></i><div><b>Resumes are never stored</b>They are read in memory and discarded. Only your job library is saved.</div></div>
-      <div class="row" style="justify-content:space-between;padding:0 4px">
-        <span class="tiny muted">v2.1 · demo on fictional data</span>
+      <div class="side-tools">
+        <span class="tiny">v2.2 · fictional data</span>
+        <button class="icon-btn" data-act="shortcuts" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts"><i data-icon="keyboard" data-size="17"></i></button>
         <button class="icon-btn" id="theme" title="Switch light / dark" aria-label="Switch theme"><i data-icon="moon"></i></button>
+        <button class="icon-btn collapse-btn" data-act="collapse" title="Collapse sidebar ([)" aria-label="Collapse sidebar"><i data-icon="chevronLeft" data-size="17"></i></button>
       </div>
     </div>
   </aside>
@@ -52,6 +58,11 @@
       <div class="crumbs" id="crumbs"></div>
       <div class="spacer"></div>
       <div class="row" id="top-actions"></div>
+      <div class="top-tools">
+        <button class="icon-btn" data-act="palette" title="Search or jump to (Ctrl K)" aria-label="Search"><i data-icon="search" data-size="17"></i></button>
+        <a class="icon-btn" href="/api/docs" target="_blank" rel="noopener" title="API reference" aria-label="API reference"><i data-icon="book" data-size="17"></i></a>
+        <span class="me" title="Demo recruiter">DR</span>
+      </div>
     </header>
     <div class="page" id="page"></div>
   </main>
