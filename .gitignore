@@ -6,3 +6,6 @@ __pycache__/
 data/
 models/
 eval/model_card.json
+eval/recruiter/
+eval/recruiter_labels.csv
+*.jsonl

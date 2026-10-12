@@ -70,3 +70,13 @@ def test_evaluation_set_stays_above_baseline():
     assert m["spearman"] >= 0.75
     assert m["stuffers_caught"] == m["stuffers"]
     assert m["false_rejections"] <= 2
+
+
+def test_detailed_bullet_naming_many_tools_is_not_stuffing():
+    from resume_ai import integrity
+    job = {"Classification", "Regression", "Python", "Scikit-learn", "Pandas", "NumPy", "SQL"}
+    real = ("Built attrition classification and salary regression models in Python with Scikit-learn, "
+            "Pandas and NumPy for 18,000 employees")
+    stuffed = "Built Classification, Regression, Python, Scikit-learn, Pandas and NumPy models"
+    assert integrity.crammed_bullets([real], job) == []
+    assert integrity.crammed_bullets([stuffed], job) == [stuffed]

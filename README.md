@@ -61,6 +61,8 @@ exactly which changes raise their score and by how much.
 - **Tune weights** with sliders or presets; ranks change live with an arrow showing who moved, and one click resets to the model.
 - **Click any number** (KPIs, pipeline counts, model metrics) for a pop-up with the detail behind it.
 - **Remove** candidates, notes, tags, resumes and session history, each with **Undo**.
+- **Close calls**: a "Not a fit" scoring 52+ (and not flagged for stuffing) is marked *worth a look*. These are often strong people from a neighbouring field; on the labelled sets the flag catches every good candidate the engine rejects while pointing at about one in six rejections.
+- **Label verdicts** as right or wrong and download them to measure and retrain the engine on your own recruiters' judgement.
 - **Interview kit**: questions written from that person's gaps ("Your resume lists Tableau but no project shows it…").
 - **Candidate feedback** you can paste into a reply, whatever the decision.
 - A **verdict pipeline bar** over three tabs: **Board** (Kanban by verdict), **Ranked list** and **Insights** (keys `1` `2` `3`).
@@ -106,7 +108,7 @@ Parts that don't apply (e.g. no education requirement) are dropped and the rest 
 | Pattern | What happens |
 |---|---|
 | Lines copied from the job description | Removed before scoring; −12 points |
-| A bullet naming 6+ required tools at once | Its skills count as listed, not shown; −6 points |
+| A bullet that is really a list of 6+ required tools (skill names fill 55%+ of it, or 10+ tools) | Its skills count as listed, not shown; −6 points |
 | Stated years well above the dated roles ("12 years" with 2 years of dates) | Dated years are used; −4 points |
 
 The penalty is capped at 20 points. Copied text or crammed bullets also cap the verdict at *Interview to verify*, so a person looks before deciding.
@@ -128,10 +130,31 @@ The penalty is capped at 20 points. Copied text or crammed bullets also cap the 
 
 ## How accurate is it?
 
-Accuracy is measured against human labels in [`eval/`](eval/): a **development set** of 60 resume–job pairs (used to design the rules) and a separate **held-out set** of 21 pairs, written and labelled before the engine scored them and never used for tuning. Both include keyword stuffers, people who describe their work without naming tools, career changers and inflated claims.
+Accuracy is measured against human labels in [`eval/`](eval/): a **development set** of 60 resume–job pairs used to design the rules, and two **held-out sets** written and labelled *before* the engine scored them. Each set includes keyword stuffers, people who describe their work without naming tools, career changers, adjacent profiles and inflated claims.
 
 | Metric | v2.1 | v2.2 | v2.3 |
 |---|---|---|---|
+| Development set: accuracy (shortlist / maybe / reject) | 76.7% | 80.0% | **88.3%** |
+| Development set: Cohen's kappa (linear-weighted) | 0.68 | 0.77 | **0.86** |
+| Held-out set 1 (21 pairs): accuracy / kappa | — | 71.4% / 0.70 | **90.5% / 0.90** |
+| Held-out set 2 (19 pairs): accuracy / kappa | — | — | **68.4% / 0.65** |
+| Keyword stuffers kept off the shortlist | 0 of 3 | 3 of 3 | 6 of 6 |
+
+**Read the held-out rows with care.** Held-out set 1 was later used to study errors, so it is now optimistic. Held-out set 2 scored **57.9% (kappa 0.51)** on first sight; its errors revealed one bug (detailed bullets naming six tools were flagged as keyword stuffing), and fixing that gives 68.4%. Its remaining errors are mostly adjacent profiles and resumes that name few tools, where human judgement varies. The honest summary: about 70–90% agreement with one author's labels on fictional resumes. Real recruiter labels (below) are what will settle it.
+
+### Measuring with real recruiters
+
+Open a candidate and answer **Is this verdict right?** (or press `S`, `M`, `R`, which also moves to the next candidate). The Insights tab shows how often you agree with the engine and where you differ. **Labels** downloads your answers with the job and resume text, and:
+
+```bash
+python eval/import_labels.py recruiter_labels.jsonl            # masks emails and phones
+python eval/evaluate.py --labels recruiter_labels.csv          # agreement with your recruiters
+python eval/train.py --labels labels.csv recruiter_labels.csv --write   # learn weights; adopted only if they win
+```
+
+Imported resumes go to `eval/recruiter/`, which is git-ignored: real resumes never reach a public repository.
+
+---|---|---|---|
 | Verdict accuracy (shortlist / maybe / reject) | 76.7% | 80.0% | **90.0%** |
 | Cohen's kappa (linear-weighted) | 0.68 | 0.77 | **0.88** |
 | Spearman rho, score vs label | 0.72 | 0.84 | 0.84 |
@@ -189,7 +212,7 @@ src/resume_ai/
   api.py             FastAPI: analyze, screen, export, parse-file, /api/jobs CRUD
 samples/             job descriptions, seed job library and 6 fictional resumes
 eval/                labelled resume-job pairs and evaluate.py (accuracy, kappa, Spearman)
-tests/               42 pytest tests (parsing, skills, JD, engine, integrity, API, job library, eval baseline)
+tests/               52 pytest tests (parsing, skills, JD, engine, integrity, API, job library, eval baseline)
 legacy/              the original Streamlit + TF-IDF version, kept for comparison
 ```
 
@@ -247,6 +270,7 @@ The library lives in SQLite at `JOBS_DB` (default `data/jobs.db`) and is seeded 
 
 ## Version history
 
+- **v2.3.1**: close-call flag for strong rejections, recruiter labelling with import and retraining, multi-phrase skill matching, role headers ignored as evidence, crammed-bullet false positives fixed, a second held-out set, and about 20% faster screening with identical scores.
 - **v2.3**: meaning-based matching (MiniLM, ONNX), a weight-learning pipeline with honest cross-validation, explain-this-score with a highlighted resume, pipeline stages with notes and tags, fairness audit, live weight tuning, clickable KPI pop-ups, delete with undo everywhere, and no public API docs page.
 - **v2.2**: integrity checks against keyword stuffing, partial credit for work described without tool names, batch-independent scores, and an evaluation set with accuracy metrics. New console UI in a bright light theme: an icon-rail sidebar that expands on hover, colour-coded workspaces, overview dashboard, insights tab, model quality page, command palette, keyboard shortcuts and a staged screening run.
 - **v2.1**: company job library: saved job descriptions with status, team and openings, live requirement preview, one-click screening and per-job counts.

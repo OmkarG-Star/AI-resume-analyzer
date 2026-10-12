@@ -84,3 +84,35 @@ def test_relevant_projects_soften_missing_years():
     r = engine.analyze(resume, job)
     assert r["verdict"]["key"] != "reject" or r["score"] < 45
     assert any("projects" in x for x in r["risks"])
+
+
+def test_keyword_similarity_matches_scikit_learn_exactly():
+    from sklearn.feature_extraction.text import TfidfVectorizer
+    from sklearn.metrics.pairwise import cosine_similarity
+    job = (SAMPLES / "jobs" / "data_engineer.txt").read_text()
+    for path in sorted(glob.glob(str(SAMPLES / "resumes" / "*.txt")))[:3]:
+        resume = open(path).read()
+        docs = [job, resume] + [d for d in engine.reference_corpus() if d not in (job, resume)]
+        m = TfidfVectorizer(stop_words="english", ngram_range=(1, 2), sublinear_tf=True).fit_transform(docs)
+        assert abs(engine.similarity(resume, job) - cosine_similarity(m[0:1], m[1:2])[0][0]) < 1e-9
+
+
+def test_close_call_flags_strong_rejects_without_changing_the_verdict():
+    job = (SAMPLES / "jobs" / "data_scientist.txt").read_text()
+    for path in sorted(glob.glob(str(SAMPLES.parent / "eval" / "**" / "*.txt"), recursive=True)):
+        r = engine.analyze(open(path).read(), job)
+        assert r["close_call"] == (r["verdict"]["key"] == "reject" and r["score"] >= engine.CLOSE_CALL
+                                   and not r["integrity"]["suspicious"])
+
+
+def test_screening_in_one_batch_matches_one_at_a_time():
+    job = (SAMPLES / "jobs" / "data_scientist.txt").read_text()
+    rs = [(p, open(p).read()) for p in sorted(glob.glob(str(SAMPLES / "resumes" / "*.txt")))]
+    batch = {c["file"]: c["score"] for c in engine.screen(job, rs)["candidates"]}
+    assert all(batch[p] == engine.analyze(t, job)["score"] for p, t in rs)
+
+
+def test_role_headers_are_not_used_as_evidence():
+    from resume_ai import semantic
+    lines = semantic.units("Data Scientist — Relecloud | Jun 2020 – Dec 2021\n- Built churn models in Python for 3 teams")
+    assert lines == ["Built churn models in Python for 3 teams"]

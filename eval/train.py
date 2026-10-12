@@ -79,8 +79,11 @@ def summary(m: dict) -> dict:
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--write", action="store_true", help="save src/resume_ai/weights.json")
+    ap.add_argument("--labels", nargs="+", default=["labels.csv"],
+                    help="label files in eval/ to learn from, e.g. labels.csv recruiter_labels.csv")
     args = ap.parse_args()
-    pp = evaluation.prepared()
+    pp = evaluation.prepared(tuple(args.labels))
+    print(f"learning from {len(pp)} labelled pairs in {', '.join(args.labels)}")
     hand = summary(evaluation.metrics(evaluation.score_with(pp, engine.HAND_WEIGHTS)))
     learned = fit(pp)
     insample = summary(evaluation.metrics(evaluation.score_with(pp, learned)))
@@ -96,6 +99,7 @@ def main() -> None:
           "no - they do not beat the hand-set weights in cross-validation, so the engine keeps the hand-set weights")
     if args.write:
         out = {"adopted": adopt, "weights": learned, "hand_weights": engine.HAND_WEIGHTS, "trained_on": len(pp),
+               "label_files": args.labels,
                "date": date.today().isoformat(), "semantic": engine.semantic.available(),
                "method": "squared hinge to label bands (<46, 50-60, >64), ridge pull to hand weights, weights 2-45, sum 100",
                "hand_metrics": hand, "in_sample": insample, "cross_validated": cv}

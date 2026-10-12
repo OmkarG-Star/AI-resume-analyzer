@@ -20,12 +20,14 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-from .skills import find_skills
+from .skills import find_skills, skill_spans
 
 SHINGLE = 5                 # words per shingle when comparing resume lines with the job
 COPY_THRESHOLD = 0.6        # share of a line's shingles found in the job to call it copied
 MIN_COPY_WORDS = 6
-CRAM_SKILLS = 6             # job skills named outright in one bullet to call it crammed
+CRAM_SKILLS = 6             # job skills named outright in one bullet to call it crammed...
+CRAM_DENSITY = 0.55         # ...when skill names make up this share of the bullet's characters
+CRAM_ALWAYS = 10            # this many job skills in one bullet is crammed whatever the density
 YEARS_GAP = 2.0             # stated years above dated years by more than this is flagged
 
 PENALTY = {"copied": 12.0, "crammed": 6.0, "years": 4.0}
@@ -83,12 +85,26 @@ def strip_lines(text: str, lines: list[str]) -> str:
 
 
 def crammed_bullets(bullets: list[str], job_skills: set[str]) -> list[str]:
-    """Bullets that name CRAM_SKILLS or more of the job's skills at once.
+    """Bullets that are really a list of the job's skills.
 
-    Implied skills are not counted, so a real bullet such as "Built Airflow
-    pipelines into Snowflake with dbt" is not mistaken for a keyword list.
+    A bullet is crammed when it names CRAM_SKILLS or more of the job's skills
+    and skill names make up at least CRAM_DENSITY of its characters ("Built
+    ETL, SQL, Airflow, Snowflake, dbt and Git pipelines"), or when it names
+    CRAM_ALWAYS or more. A detailed bullet that happens to name six tools in a
+    real sentence ("Built attrition classification and salary regression
+    models in Python with Scikit-learn, Pandas and NumPy for 18,000
+    employees", density about 0.49) is not. Implied skills are not counted.
     """
-    return [b for b in bullets if len(set(find_skills(b, implied=False)) & job_skills) >= CRAM_SKILLS]
+    out = []
+    for b in bullets:
+        named = set(find_skills(b, implied=False)) & job_skills
+        if len(named) >= CRAM_ALWAYS:
+            out.append(b)
+        elif len(named) >= CRAM_SKILLS:
+            density = sum(e - s for s, e, _ in skill_spans(b)) / max(len(b), 1)
+            if density >= CRAM_DENSITY:
+                out.append(b)
+    return out
 
 
 def check(copied: list[str], bullets: list[str], job_skills: set[str],

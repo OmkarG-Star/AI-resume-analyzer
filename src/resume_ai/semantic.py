@@ -22,7 +22,7 @@ import numpy as np
 
 DEFAULT_DIR = Path(__file__).resolve().parents[2] / "models" / "minilm"
 MAX_TOKENS = 128
-BATCH = 32
+BATCH = 64
 
 _lock = threading.Lock()
 _state: dict = {"loaded": False, "session": None, "tokenizer": None, "error": None}
@@ -92,6 +92,7 @@ def embed(texts: list[str]) -> np.ndarray:
             todo.append(i)
     sess, tok = _state["session"], _state["tokenizer"]
     names = {i.name for i in sess.get_inputs()}
+    todo.sort(key=lambda i: len(texts[i]))      # similar lengths together: less padding per batch
     for s in range(0, len(todo), BATCH):
         idx = todo[s:s + BATCH]
         enc = tok.encode_batch([texts[i] for i in idx])
@@ -117,11 +118,20 @@ def embed(texts: list[str]) -> np.ndarray:
 _SPLIT = re.compile(r"(?<=[.;!?])\s+|\n+")
 
 
+_ROLE_HEADER = re.compile(r"(19|20)\d{2}\s*(?:-|–|—|to|till|until)\s*(?:(?:\w+\.?\s*)?(19|20)\d{2}|present|current|now)", re.I)
+
+
 def units(text: str, min_words: int = 4, limit: int = 40) -> list[str]:
-    """Sentences and bullet lines long enough to carry meaning."""
+    """Sentences and bullet lines long enough to carry meaning.
+
+    Role headers ("Data Scientist — Acme | Jun 2020 – Present") are left out:
+    a job title with dates says nothing about the work itself.
+    """
     seen, out = set(), []
     for part in _SPLIT.split(text):
         p = re.sub(r"^\s*(?:[-•*▪●◦‣·]|\d+[.)])\s+", "", part).strip()
+        if _ROLE_HEADER.search(p) and len(p.split()) <= 12:
+            continue
         if len(p.split()) >= min_words and p.lower() not in seen:
             seen.add(p.lower())
             out.append(p[:400])
@@ -145,14 +155,22 @@ def coverage(job_lines: list[str], resume_lines: list[str]) -> tuple[float, list
     return float(np.mean([p["sim"] for p in pairs])), pairs
 
 
-def best_evidence(queries: dict[str, str], resume_lines: list[str]) -> dict[str, tuple[str, float]]:
-    """For each {key: query text}, the closest resume line and its similarity."""
+def best_evidence(queries: dict[str, str | list[str]], resume_lines: list[str]) -> dict[str, tuple[str, float]]:
+    """For each {key: query text or list of phrasings}, the closest resume line
+    and its similarity (the best over all phrasings)."""
     if not queries or not resume_lines:
         return {}
     keys = list(queries)
-    sims = embed([queries[k] for k in keys]) @ embed(resume_lines).T
+    flat, owner = [], []
+    for i, k in enumerate(keys):
+        qs = queries[k] if isinstance(queries[k], list) else [queries[k]]
+        flat += qs
+        owner += [i] * len(qs)
+    sims = embed(flat) @ embed(resume_lines).T                 # (phrasings, lines)
+    owner = np.array(owner)
     out = {}
     for i, k in enumerate(keys):
-        j = int(sims[i].argmax())
-        out[k] = (resume_lines[j], float(sims[i, j]))
+        block = sims[owner == i]
+        q, j = np.unravel_index(int(block.argmax()), block.shape)
+        out[k] = (resume_lines[j], float(block[q, j]))
     return out

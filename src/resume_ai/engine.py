@@ -19,20 +19,21 @@ worked out by re-scoring the resume with that fix applied.
 from __future__ import annotations
 
 import json
+import math
 import os
 import re
+from collections import Counter
 from dataclasses import dataclass, field, replace
 from functools import lru_cache
 from pathlib import Path
 
 from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS, TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
 
 from . import integrity, semantic
 from . import jd as jdmod
 from .parsing import Profile, mask_pii, merged_years, profile, roles
 from .skills import (CATEGORY, RELATED_CREDIT, by_category, find_related, find_skills,  # noqa: F401
-                     skill_query, skill_spans)
+                     skill_queries, skill_spans)
 
 # Hand-set starting weights. eval/train.py learns weights from the labelled set
 # and writes weights.json next to this file; when present, those are used.
@@ -42,7 +43,9 @@ WEIGHTS_FILE = Path(__file__).with_name("weights.json")
 PART_LABELS = {"must": "Must-have skills", "nice": "Nice-to-have skills", "experience": "Experience",
                "education": "Education", "similarity": "Keyword relevance", "semantic": "Meaning match",
                "evidence": "Evidence of impact", "quality": "Resume quality"}
-SEM_RELATED = 0.55     # similarity at which a resume line counts as describing a missing skill
+CLOSE_CALL = 52.0      # a "Not a fit" scoring at least this gets a close-call flag
+SEM_RELATED = 0.45     # similarity at which a resume line counts as describing a missing skill
+                       # (no unrelated line in the calibration pairs reached 0.39; see tests)
 
 
 def _load_weights() -> tuple[dict[str, float], str]:
@@ -161,7 +164,7 @@ def add_semantic(f: Features, spec: jdmod.JobSpec) -> list[dict]:
     wanted = [s for s in dict.fromkeys(spec.required + spec.preferred)
               if s not in f.found and s not in f.related]
     if wanted:
-        for skill, (line, sim) in semantic.best_evidence({s: skill_query(s) for s in wanted}, lines).items():
+        for skill, (line, sim) in semantic.best_evidence({s: skill_queries(s) for s in wanted}, lines).items():
             if sim >= SEM_RELATED:
                 f.related[skill] = line if len(line) <= 90 else line[:87].rstrip() + "…"
     return sorted(pairs, key=lambda p: -p["sim"])
@@ -184,11 +187,47 @@ def reference_corpus() -> tuple[str, ...]:
     return tuple(p.read_text(encoding="utf-8") for p in sorted(REFERENCE_DIR.rglob("*.txt")))
 
 
+_ANALYZER = TfidfVectorizer(stop_words="english", ngram_range=(1, 2)).build_analyzer()
+
+
+@lru_cache(maxsize=4096)
+def _terms(text: str) -> Counter:
+    return Counter(_ANALYZER(text))
+
+
+@lru_cache(maxsize=32)
+def _corpus_df(jd_text: str) -> tuple[int, Counter]:
+    """Document frequencies of the reference corpus plus the job, computed once per job."""
+    docs = [jd_text] + [d for d in reference_corpus() if d != jd_text]
+    df: Counter = Counter()
+    for d in docs:
+        df.update(set(_terms(d)))
+    return len(docs), df
+
+
 def similarity(resume: str, jd_text: str) -> float:
-    docs = [jd_text, resume] + [d for d in reference_corpus() if d not in (jd_text, resume)]
-    vec = TfidfVectorizer(stop_words="english", ngram_range=(1, 2), sublinear_tf=True, min_df=1)
-    m = vec.fit_transform(docs)
-    return float(cosine_similarity(m[0:1], m[1:2])[0][0])
+    """TF-IDF cosine between resume and job, weighted against a fixed reference corpus.
+
+    Identical to fitting scikit-learn's TfidfVectorizer(stop_words="english",
+    ngram_range=(1, 2), sublinear_tf=True) on [job, resume] + corpus, but the
+    corpus is tokenised once per job instead of once per resume.
+    """
+    n, df = _corpus_df(jd_text)
+    r_terms, j_terms = _terms(resume), _terms(jd_text)
+    in_corpus = resume in reference_corpus() and resume != jd_text
+    if not in_corpus and resume != jd_text:
+        n += 1
+    def vec(terms):
+        out = {}
+        for t, c in terms.items():
+            d = df.get(t, 0) + (1 if (t in r_terms and not in_corpus and resume != jd_text) else 0)
+            out[t] = (1 + math.log(c)) * (math.log((1 + n) / (1 + d)) + 1)
+        norm = math.sqrt(sum(v * v for v in out.values())) or 1.0
+        return {t: v / norm for t, v in out.items()}
+    a, b = vec(j_terms), vec(r_terms)
+    if len(a) > len(b):
+        a, b = b, a
+    return float(sum(v * b.get(t, 0.0) for t, v in a.items()))
 
 
 # ------------------------------------------------------------------ scoring
@@ -560,7 +599,7 @@ def _suggestions(spec, f, parts, table, p, base_score) -> list[dict]:
     return out
 
 
-def prepare(resume_text: str, spec: jdmod.JobSpec):
+def prepare(resume_text: str, spec: jdmod.JobSpec, with_semantic: bool = True):
     """Everything about a resume-job pair that does not depend on the weights."""
     jd_skills = set(spec.required) | set(spec.preferred)
     copied = integrity.copied_lines(resume_text, spec.text)
@@ -569,7 +608,7 @@ def prepare(resume_text: str, spec: jdmod.JobSpec):
     integ = integrity.check(copied, p.bullets, jd_skills, p.stated_years, p.dated_years)
     f = features_from(p, similarity(p.text, spec.text), integ.crammed_bullets)
     relevant_experience(f, p, spec)
-    pairs = add_semantic(f, spec)
+    pairs = add_semantic(f, spec) if with_semantic else []
     return p, f, integ, pairs
 
 
@@ -652,10 +691,10 @@ def highlights(text: str, table: list[dict], f: Features) -> list[dict]:
 
 
 def analyze(resume_text: str, jd_text: str, *, assume_skills: list[str] | None = None,
-            spec: jdmod.JobSpec | None = None) -> dict:
+            spec: jdmod.JobSpec | None = None, prepared: tuple | None = None) -> dict:
     spec = spec or jdmod.parse(jd_text)
     jd_skills = set(spec.required) | set(spec.preferred)
-    p, f, integ, pairs = prepare(resume_text, spec)
+    p, f, integ, pairs = prepared or prepare(resume_text, spec)
     if assume_skills:
         f.extra = set(assume_skills)
     parts = score_parts(f, spec)
@@ -670,8 +709,14 @@ def analyze(resume_text: str, jd_text: str, *, assume_skills: list[str] | None =
     active_w = sum(WEIGHTS[k] for k, v in parts.items() if v is not None)
     shown_text = mask_pii(p.text)
 
+    close_call = verdict_key == "reject" and score >= CLOSE_CALL and not integ.suspicious
+    if close_call:
+        risks.insert(0, "Close call: a strong profile that misses several must-haves, often someone from a "
+                        "neighbouring field. Worth a quick look before declining.")
+
     return {
         "score": score,
+        "close_call": close_call,
         "integrity": integ.as_dict(),
         "verdict": {"key": verdict_key, **VERDICTS[verdict_key], "knockouts": knockouts},
         "confidence": {"level": conf, "note": conf_note},
@@ -720,9 +765,18 @@ def job_summary(spec: jdmod.JobSpec) -> dict:
 def screen(jd_text: str, resumes: list[tuple[str, str]]) -> dict:
     """Rank many resumes against one job. resumes = [(file name, text), ...]"""
     spec = jdmod.parse(jd_text)
+    # Read every resume first, then send all their work lines through the
+    # language model in one length-sorted pass (much less padding than one
+    # small batch per resume). The per-resume step then reads from the cache.
+    prepped = [prepare(text, spec, with_semantic=False) for _, text in resumes]
+    if semantic.available():
+        lines = [u for _, f, _, _ in prepped for u in semantic.units(f.work_text)]
+        lines += semantic.units(spec.text, limit=30)
+        semantic.embed(list(dict.fromkeys(lines)))
     results = []
-    for i, (fname, text) in enumerate(resumes, start=1):
-        r = analyze(text, jd_text, spec=spec)
+    for i, ((fname, text), (p, f, integ, _)) in enumerate(zip(resumes, prepped), start=1):
+        pairs = add_semantic(f, spec)
+        r = analyze(text, jd_text, spec=spec, prepared=(p, f, integ, pairs))
         r["id"] = f"C{i:02d}"
         r["label"] = f"Candidate {i:02d}"
         r["file"] = fname

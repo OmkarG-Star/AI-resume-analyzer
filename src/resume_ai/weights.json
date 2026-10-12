@@ -1,14 +1,14 @@
 {
   "adopted": false,
   "weights": {
-    "must": 32.8,
-    "nice": 11.4,
-    "experience": 11.6,
-    "education": 2.4,
-    "similarity": 14.2,
-    "semantic": 13.6,
-    "evidence": 9.5,
-    "quality": 4.5
+    "must": 32.4,
+    "nice": 11.2,
+    "experience": 11.4,
+    "education": 2.5,
+    "similarity": 13.9,
+    "semantic": 13.9,
+    "evidence": 9.9,
+    "quality": 4.8
   },
   "hand_weights": {
     "must": 34,
@@ -21,14 +21,17 @@
     "quality": 7
   },
   "trained_on": 60,
+  "label_files": [
+    "labels.csv"
+  ],
   "date": "2026-10-12",
   "semantic": true,
   "method": "squared hinge to label bands (<46, 50-60, >64), ridge pull to hand weights, weights 2-45, sum 100",
   "hand_metrics": {
     "n": 60,
-    "accuracy": 0.9,
-    "kappa": 0.8839,
-    "spearman": 0.8379,
+    "accuracy": 0.8833,
+    "kappa": 0.8649,
+    "spearman": 0.8451,
     "p_at_1": 1.0,
     "p_at_3": 1.0,
     "false_rejections": 1,
@@ -38,24 +41,24 @@
   },
   "in_sample": {
     "n": 60,
-    "accuracy": 0.8667,
-    "kappa": 0.8357,
-    "spearman": 0.8432,
+    "accuracy": 0.85,
+    "kappa": 0.814,
+    "spearman": 0.8435,
     "p_at_1": 1.0,
     "p_at_3": 0.9333,
-    "false_rejections": 2,
+    "false_rejections": 1,
     "good": 26,
     "stuffers_caught": 3,
     "stuffers": 3
   },
   "cross_validated": {
     "n": 60,
-    "accuracy": 0.8667,
-    "kappa": 0.8357,
-    "spearman": 0.8278,
+    "accuracy": 0.85,
+    "kappa": 0.814,
+    "spearman": 0.8242,
     "p_at_1": 1.0,
     "p_at_3": 0.9333,
-    "false_rejections": 2,
+    "false_rejections": 1,
     "good": 26,
     "stuffers_caught": 3,
     "stuffers": 3

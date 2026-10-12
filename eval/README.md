@@ -5,6 +5,8 @@ How well do the verdicts agree with a person's judgement? This folder answers th
 - `labels.csv`: 60 resume-job pairs, each labelled **shortlist**, **maybe** or **reject**.
 - `resumes/`: 14 extra fictional resumes chosen to be hard for a keyword screener. They include people who describe their work without naming tools, keyword stuffers who paste the job description, an inflated "10 years" claim, career changers and fresh graduates.
 - `holdout/` and `holdout_labels.csv`: 12 more resumes (21 pairs) written and labelled *before* the engine scored them, and never used to tune it. Run `python eval/evaluate.py --labels holdout_labels.csv`.
+- `holdout2/` and `holdout2_labels.csv`: a second held-out set (12 resumes, 19 pairs), committed before the engine scored it.
+- `import_labels.py`: turns labels downloaded from the app (recruiters marking verdicts right or wrong) into `recruiter_labels.csv`.
 - `evaluate.py`: scores every pair and reports the agreement.
 - `train.py`: learns weights and keeps them only if they beat the hand-set ones under leave-one-resume-out cross-validation.
 

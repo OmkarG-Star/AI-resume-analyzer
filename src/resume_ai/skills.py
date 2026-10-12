@@ -244,8 +244,39 @@ SKILL_DESC: dict[str, str] = {
 }
 
 
+# Short extra phrasings. A long description dilutes the match for terse resume
+# lines, so each skill is compared with its description and these, and the best
+# match counts.
+SKILL_PHRASES: dict[str, list[str]] = {
+    "Classification": ["classification model", "predicted whether something will happen", "churn or attrition prediction model"],
+    "Regression": ["regression model", "predicted a numeric value such as price, time or salary"],
+    "Feature Engineering": ["feature engineering", "derived input features for a model"],
+    "Model Evaluation": ["model evaluation", "evaluated models with cross-validation, precision, recall or AUC"],
+    "Machine Learning": ["machine learning model", "trained predictive models"],
+    "Statistics": ["statistical analysis", "hypothesis tests and significance"],
+    "Airflow": ["Airflow", "orchestrated scheduled data pipelines as DAGs"],
+    "ETL": ["ETL pipeline", "loaded data from source systems into a warehouse"],
+    "dbt": ["dbt", "SQL transformation models with tests in a data warehouse"],
+    "Data Warehousing": ["data warehouse", "fact and dimension tables in a warehouse"],
+    "Data Modeling": ["data modeling", "designed star schema tables"],
+    "Data Quality": ["data quality checks", "checks that stop bad or duplicate data"],
+    "Kafka": ["Kafka", "streamed events in real time"],
+    "CI/CD": ["CI/CD", "automated build and deployment pipelines"],
+    "Git": ["Git", "version control with pull request reviews"],
+    "HR Analytics": ["HR analytics", "analysed employee attrition, headcount or hiring data"],
+    "Data Visualization": ["data visualization", "built dashboards and charts"],
+    "Data Cleaning": ["data cleaning", "cleaned and deduplicated records"],
+    "MLOps": ["MLOps", "deployed and monitored machine learning models in production"],
+}
+
+
 def skill_query(skill: str) -> str:
     return SKILL_DESC.get(skill) or f"{skill} ({CATEGORY.get(skill, 'skill')})"
+
+
+def skill_queries(skill: str) -> list[str]:
+    """Every phrasing used to look for a skill described without its name."""
+    return [skill_query(skill)] + SKILL_PHRASES.get(skill, [])
 
 CATEGORY: dict[str, str] = {s: cat for cat, skills in TAXONOMY.items() for s in skills}
 ALL_SKILLS: list[str] = list(CATEGORY)

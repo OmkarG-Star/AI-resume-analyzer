@@ -104,27 +104,34 @@ def metrics(results: list[dict]) -> dict:
     }
 
 
+def job_text(key: str) -> str:
+    """A label row's job: a short key for the sample jobs (ds, de, …) or a file path under eval/."""
+    return (ROOT / JOBS.get(key, key)).read_text(encoding="utf-8")
+
+
 def run(engine=None, labels: str = "labels.csv") -> dict:
     """Score every labelled pair with the engine as configured. `engine` defaults to this package's.
-    `labels` picks the file in eval/: labels.csv (development set) or holdout_labels.csv."""
+    `labels` picks the file in eval/: labels.csv (development set), holdout_labels.csv,
+    holdout2_labels.csv or recruiter_labels.csv (imported from the app)."""
     if engine is None:
         from . import engine
-    jobs = {k: (ROOT / v).read_text(encoding="utf-8") for k, v in JOBS.items()}
     results = []
     for r in _rows(labels):
-        out = engine.analyze((ROOT / r["resume"]).read_text(encoding="utf-8"), jobs[r["job"]])
+        out = engine.analyze((ROOT / r["resume"]).read_text(encoding="utf-8"), job_text(r["job"]))
         results.append({**r, "score": out["score"], "verdict": out["verdict"]["label"],
                         "pred": VERDICT_CLASS[out["verdict"]["key"]]})
     return metrics(results)
 
 
-def prepared() -> list[dict]:
+def prepared(labels: tuple[str, ...] = ("labels.csv",)) -> list[dict]:
     """Weight-independent state for every labelled pair, so weights can be re-tried quickly."""
     from . import engine
     from . import jd as jdmod
-    specs = {k: jdmod.parse((ROOT / v).read_text(encoding="utf-8")) for k, v in JOBS.items()}
+    specs: dict[str, object] = {}
     out = []
-    for r in _rows():
+    for r in (row for name in labels for row in _rows(name)):
+        if r["job"] not in specs:
+            specs[r["job"]] = jdmod.parse(job_text(r["job"]))
         spec = specs[r["job"]]
         p, f, integ, _ = engine.prepare((ROOT / r["resume"]).read_text(encoding="utf-8"), spec)
         parts = engine.score_parts(f, spec)
@@ -165,17 +172,29 @@ def build_card() -> dict | None:
                            "verdict": r["verdict"], "score": r["score"], "note": r["note"]}
                           for r in m["results"] if r["label"] != r["pred"]],
         "jobs": JOB_NAMES,
-        "holdout": _holdout(),
+        "holdouts": _holdouts(),
     }
 
 
-def _holdout() -> dict | None:
-    """Agreement on the held-out pairs, labelled before the engine ever scored them."""
-    if not (ROOT / "eval" / "holdout_labels.csv").exists():
-        return None
-    h = run(labels="holdout_labels.csv")
-    return {k: h[k] for k in ("n", "accuracy", "kappa", "spearman", "p_at_3", "false_rejections", "good",
-                              "stuffers_caught", "stuffers")}
+HOLDOUTS = [
+    ("holdout_labels.csv", "Held-out set 1",
+     "Labelled before scoring; later used to study errors, so slightly optimistic."),
+    ("holdout2_labels.csv", "Held-out set 2",
+     "Labelled before scoring. First unseen score was 57.9% (kappa 0.51); one bug found in its errors "
+     "(real bullets flagged as stuffing) was then fixed."),
+]
+
+
+def _holdouts() -> list[dict]:
+    """Agreement on the held-out sets: resume-job pairs labelled before the engine scored them."""
+    out = []
+    for fname, name, note in HOLDOUTS:
+        if not (ROOT / "eval" / fname).exists():
+            continue
+        h = run(labels=fname)
+        out.append({"name": name, "note": note, **{k: h[k] for k in (
+            "n", "accuracy", "kappa", "spearman", "p_at_3", "false_rejections", "good", "stuffers_caught", "stuffers")}})
+    return out
 
 
 def write_card() -> None:
