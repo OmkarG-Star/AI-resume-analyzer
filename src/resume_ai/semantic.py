@@ -35,31 +35,33 @@ def model_dir() -> Path:
 
 
 def _load() -> None:
+    """Load the model once. Callers arriving while it loads wait for it, so
+    every request sees the same answer (never a half-loaded "not available")."""
     if _state["loaded"]:
         return
     with _lock:
         if _state["loaded"]:
             return
-        _state["loaded"] = True
+        session = tokenizer = error = None
         if os.environ.get("SEMANTIC", "on").lower() in ("off", "0", "false"):
-            _state["error"] = "turned off with SEMANTIC=off"
-            return
-        d = model_dir()
-        try:
-            import onnxruntime as ort
-            from tokenizers import Tokenizer
+            error = "turned off with SEMANTIC=off"
+        else:
+            d = model_dir()
+            try:
+                import onnxruntime as ort
+                from tokenizers import Tokenizer
 
-            opts = ort.SessionOptions()
-            opts.intra_op_num_threads = int(os.environ.get("SEMANTIC_THREADS", "1"))
-            opts.inter_op_num_threads = 1
-            _state["session"] = ort.InferenceSession(str(d / "model.onnx"), opts, providers=["CPUExecutionProvider"])
-            tok = Tokenizer.from_file(str(d / "tokenizer.json"))
-            tok.enable_truncation(MAX_TOKENS)
-            tok.enable_padding(pad_id=0, pad_token="[PAD]")
-            _state["tokenizer"] = tok
-        except Exception as e:  # missing files, missing packages, corrupt model
-            _state["session"] = None
-            _state["error"] = f"{type(e).__name__}: {e}"
+                opts = ort.SessionOptions()
+                opts.intra_op_num_threads = int(os.environ.get("SEMANTIC_THREADS", "1"))
+                opts.inter_op_num_threads = 1
+                session = ort.InferenceSession(str(d / "model.onnx"), opts, providers=["CPUExecutionProvider"])
+                tokenizer = Tokenizer.from_file(str(d / "tokenizer.json"))
+                tokenizer.enable_truncation(MAX_TOKENS)
+                tokenizer.enable_padding(pad_id=0, pad_token="[PAD]")
+            except Exception as e:  # missing files, missing packages, corrupt model
+                session, tokenizer, error = None, None, f"{type(e).__name__}: {e}"
+        _state.update(session=session, tokenizer=tokenizer, error=error)
+        _state["loaded"] = True          # last: only now may callers skip the lock
 
 
 def available() -> bool:
@@ -118,7 +120,7 @@ def embed(texts: list[str]) -> np.ndarray:
 _SPLIT = re.compile(r"(?<=[.;!?])\s+|\n+")
 
 
-_ROLE_HEADER = re.compile(r"(19|20)\d{2}\s*(?:-|–|—|to|till|until)\s*(?:(?:\w+\.?\s*)?(19|20)\d{2}|present|current|now)", re.I)
+from .parsing import RANGE_RE as _ROLE_HEADER, SINCE_RE as _SINCE  # noqa: E402  (role headers carry dates)
 
 
 def units(text: str, min_words: int = 4, limit: int = 40) -> list[str]:
@@ -130,7 +132,7 @@ def units(text: str, min_words: int = 4, limit: int = 40) -> list[str]:
     seen, out = set(), []
     for part in _SPLIT.split(text):
         p = re.sub(r"^\s*(?:[-•*▪●◦‣·]|\d+[.)])\s+", "", part).strip()
-        if _ROLE_HEADER.search(p) and len(p.split()) <= 12:
+        if (_ROLE_HEADER.search(p) or _SINCE.search(p)) and len(p.split()) <= 12:
             continue
         if len(p.split()) >= min_words and p.lower() not in seen:
             seen.add(p.lower())

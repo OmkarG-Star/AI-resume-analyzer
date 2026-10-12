@@ -63,8 +63,9 @@ def seed_jobs() -> list[dict]:
 @asynccontextmanager
 async def lifespan(_app):
     store.init(seed_jobs())
-    # Score the labelled set in the background so the Model quality page opens instantly.
-    threading.Thread(target=evaluation.model_card, daemon=True).start()
+    # Load the language model and the Model quality numbers in the background,
+    # so the first screening after a cold start does not pay for them.
+    threading.Thread(target=lambda: (engine.semantic.available(), evaluation.model_card()), daemon=True).start()
     yield
 
 

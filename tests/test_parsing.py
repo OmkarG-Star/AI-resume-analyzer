@@ -36,3 +36,50 @@ def test_pii_is_masked():
 def test_year_ranges_are_not_phone_numbers():
     assert mask_pii("Analyst 2020-2022") == "Analyst 2020-2022"
     assert not profile("Jane Doe\nExperience\nAnalyst 2019-2023").has_phone
+
+
+def test_common_date_formats_are_read():
+    from datetime import date
+    from resume_ai.parsing import years_from_ranges
+    today = date(2026, 10, 12)
+    cases = {"Jan 2020 – Present": 6.8, "06/2021 - 05/2023": 2.0, "6/2021 to 5/2023": 2.0, "2021-06 to 2023-05": 2.0,
+             "Jun'21 – Present": 5.4, "Jun ’21 - May ’23": 2.0, "Jan-2020 to Dec-2022": 3.0, "March 2020 to Till Date": 6.6,
+             "Since 2020": 6.8, "Jan 2020 to till now": 6.8, "01.2020 – 12.2022": 3.0, "2019 - 2021": 3.0, "2017 to date": 9.8}
+    for text, want in cases.items():
+        got = years_from_ranges("Analyst — Acme | " + text, today)
+        assert got is not None and abs(got - want) <= 0.25, (text, got)
+    assert years_from_ranges("Call +91 98765 43210", today) is None
+
+
+def test_unusual_headings_and_bullet_symbols():
+    from resume_ai.parsing import _heading_key, profile
+    assert _heading_key("Professional Experience & Projects") == "experience"
+    assert _heading_key("Areas of Expertise") == "skills"
+    assert _heading_key("- Data quality training") is None
+    assert _heading_key("Python, SQL, Airflow") is None
+    p = profile("Work History\n➢ Built Airflow pipelines for 40 teams\n✔ Reduced cost by 20%\nSkill Set\nPython, SQL")
+    assert {"experience", "skills"} <= set(p.sections)
+    assert p.bullets[0].startswith("Built")
+
+
+def test_docx_tables_stay_under_their_heading():
+    import io
+    import docx
+    from resume_ai.parsing import extract_text, profile
+    d = docx.Document()
+    d.add_paragraph("Skills")
+    t = d.add_table(rows=1, cols=3)
+    for i, s in enumerate(["Python", "SQL", "Airflow"]):
+        t.cell(0, i).text = s
+    d.add_paragraph("Education")
+    d.add_paragraph("B.Tech, 2021")
+    buf = io.BytesIO()
+    d.save(buf)
+    p = profile(extract_text("r.docx", buf.getvalue()))
+    assert "Airflow" in p.sections["skills"] and "Airflow" not in p.sections.get("education", "")
+
+
+def test_non_english_resume_is_flagged():
+    from resume_ai.parsing import profile
+    p = profile("अर्जुन नायर\nअनुभव\nडेटा इंजीनियर — वुडग्रोव बैंक\nकौशल\nPython")
+    assert any("not in English" in w for w in p.warnings)

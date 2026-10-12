@@ -99,6 +99,8 @@ Parts that don't apply (e.g. no education requirement) are dropped and the rest 
 
 **Learned weights, adopted only when they win.** `python eval/train.py --write` fits the weights to the labelled set (squared hinge to each label's score band, pulled toward the hand-set weights) and tests them with leave-one-resume-out cross-validation. They are used only if they beat the hand-set weights on resumes the fit never saw. On the current 60 author-labelled pairs they don't (kappa 0.77 vs 0.79), so the hand-set weights stay; with real recruiter labels, re-running the script switches over automatically when learning helps.
 
+**Reading the resume.** Dates are read in the styles real resumes use: *Jan 2020 – Present*, *06/2021 – 05/2023*, *Jun'21 – Till Date*, *Jan-2020 to Dec-2022*, *2021-06 to 2023-05*, *Since 2020* and more. Section headings are matched by meaning ("Areas of Expertise" is Skills), bullets by any common symbol, and Word tables stay where they appear. The screener reads English resumes; others get a clear warning.
+
 **Reading the job.** Skills under *Requirements* are must-haves. Skills under *Nice to have*, or in sentences with "preferred", "bonus" or "a plus", are nice-to-haves. Skills that appear only in the duties count as nice-to-haves when the advert has an explicit requirements list. **"Power BI or Tableau" is one requirement**: either skill satisfies it.
 
 **Described, not named.** "Orchestrated DAG-based workflows" is Airflow-type work, even if the resume never says Airflow. About 20 skills have plain-language patterns like this. A match earns 40% credit, is shown as *Described, not named*, and adds an interview question asking which tool was used. It never counts as full credit.
@@ -212,7 +214,7 @@ src/resume_ai/
   api.py             FastAPI: analyze, screen, export, parse-file, /api/jobs CRUD
 samples/             job descriptions, seed job library and 6 fictional resumes
 eval/                labelled resume-job pairs and evaluate.py (accuracy, kappa, Spearman)
-tests/               52 pytest tests (parsing, skills, JD, engine, integrity, API, job library, eval baseline)
+tests/               57 pytest tests (parsing, skills, JD, engine, integrity, API, job library, eval baseline)
 legacy/              the original Streamlit + TF-IDF version, kept for comparison
 ```
 
@@ -270,6 +272,7 @@ The library lives in SQLite at `JOBS_DB` (default `data/jobs.db`) and is seeded 
 
 ## Version history
 
+- **v2.3.2**: reads 23 real-world date formats (06/2021, Jun'21, Jan-2020, Since 2020, till now, 01.2020…), unusual section headings ("Areas of Expertise", "Professional Experience & Projects"), more bullet symbols (➢ ✓ ◆ ► ■), Word tables in document order, a warning for non-English resumes, and a fix for a start-up race where the first screening after a cold start could skip meaning-matching.
 - **v2.3.1**: close-call flag for strong rejections, recruiter labelling with import and retraining, multi-phrase skill matching, role headers ignored as evidence, crammed-bullet false positives fixed, a second held-out set, and about 20% faster screening with identical scores.
 - **v2.3**: meaning-based matching (MiniLM, ONNX), a weight-learning pipeline with honest cross-validation, explain-this-score with a highlighted resume, pipeline stages with notes and tags, fairness audit, live weight tuning, clickable KPI pop-ups, delete with undo everywhere, and no public API docs page.
 - **v2.2**: integrity checks against keyword stuffing, partial credit for work described without tool names, batch-independent scores, and an evaluation set with accuracy metrics. New console UI in a bright light theme: an icon-rail sidebar that expands on hover, colour-coded workspaces, overview dashboard, insights tab, model quality page, command palette, keyboard shortcuts and a staged screening run.

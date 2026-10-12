@@ -82,3 +82,14 @@ def test_analysis_explains_points_and_highlights():
     ev = r["evidence"]
     assert ev["highlights"] and all(0 <= h["start"] < h["end"] <= len(ev["text"]) for h in ev["highlights"])
     assert {"miss_ratio", "experience", "suspicious", "penalty"} <= set(r["verdict_inputs"])
+
+
+def test_model_is_never_reported_half_loaded():
+    import threading
+    from resume_ai import semantic
+    semantic._state.update(loaded=False, session=None, tokenizer=None, error=None)
+    answers = []
+    threads = [threading.Thread(target=lambda: answers.append(semantic.available())) for _ in range(8)]
+    [t.start() for t in threads]
+    [t.join() for t in threads]
+    assert len(set(answers)) == 1
