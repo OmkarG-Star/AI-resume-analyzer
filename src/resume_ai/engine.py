@@ -30,7 +30,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 from . import integrity, semantic
 from . import jd as jdmod
-from .parsing import Profile, mask_pii, profile
+from .parsing import Profile, mask_pii, merged_years, profile, roles
 from .skills import (CATEGORY, RELATED_CREDIT, by_category, find_related, find_skills,  # noqa: F401
                      skill_query, skill_spans)
 
@@ -110,6 +110,8 @@ class Features:
     similarity: float
     extra: set[str] = field(default_factory=set)      # what-if: skills the candidate confirms they have
     semantic: float | None = None                     # mean best similarity of job lines to resume lines
+    total_years: float | None = None                  # all dated roles; `years` counts only relevant ones
+    project_evidence: bool = False                    # projects use 2+ skills from the job's fields
     work_text: str = ""
     related: dict[str, str] = field(default_factory=dict)  # skill -> phrase describing it without naming it
 
@@ -234,6 +236,10 @@ def score_parts(f: Features, spec: jdmod.JobSpec) -> dict[str, float]:
         else:
             ratio = f.years / spec.min_years
             parts["experience"] = 1.0 if ratio >= 1 else max(0.0, ratio) ** 0.8
+            if f.project_evidence:
+                # Relevant projects stand in for some missing years: enough to
+                # avoid a knock-out, never enough for a shortlist on their own.
+                parts["experience"] = max(parts["experience"], 0.5)
     else:
         parts["experience"] = 1.0 if (f.years or f.n_bullets >= 3) else 0.6
 
@@ -321,7 +327,7 @@ def _verdict(score: float, parts: dict, table: list[dict],
         return ("verify" if score >= 48 else "reject"), knockouts
     if score >= 74 and miss_ratio <= 0.3 and parts["experience"] >= 0.8:
         return "strong", knockouts
-    if score >= 62 and miss_ratio <= 0.34:
+    if score >= 62 and miss_ratio <= 0.34 and parts["experience"] >= 0.6:
         return "shortlist", knockouts
     if score >= 48:
         return "verify", knockouts
@@ -370,6 +376,10 @@ def _strengths_risks(spec, f, parts, table, p) -> tuple[list[str], list[str]]:
             risks.append("Could not find dated roles, so experience is unverified")
         elif f.years < spec.min_years:
             risks.append(f"{f.years:g} years of experience against {spec.min_years:g}+ required")
+    if spec.min_years and (f.years or 0) < spec.min_years and f.project_evidence:
+        risks.append("Relevant experience comes mainly from projects: check their depth in the interview")
+    if f.total_years is not None and f.total_years - (f.years or 0) >= 1:
+        risks.append(f"{f.years:g} of {f.total_years:g} years are in roles that use this job's skills")
     if f.n_bullets and f.n_quant == 0:
         risks.append("No measurable results in any bullet")
     if spec.education_level and 0 < f.education_level < spec.education_level:
@@ -558,8 +568,46 @@ def prepare(resume_text: str, spec: jdmod.JobSpec):
     p = profile(clean_text)
     integ = integrity.check(copied, p.bullets, jd_skills, p.stated_years, p.dated_years)
     f = features_from(p, similarity(p.text, spec.text), integ.crammed_bullets)
+    relevant_experience(f, p, spec)
     pairs = add_semantic(f, spec)
     return p, f, integ, pairs
+
+
+def relevant_experience(f: Features, p: Profile, spec: jdmod.JobSpec) -> None:
+    """Count only the roles that use this job's skills.
+
+    A role counts when its title and lines name at least two skills from the
+    job's fields (the skill categories its requirements come from, such as
+    Machine Learning or Data Engineering), or at least one of the job's own
+    skills when the job lists three or fewer. Seven years as a production
+    engineer are not seven years of data analysis, while an ML engineer's
+    PyTorch work does count towards a data scientist role. When roles carry
+    no detail under their dates, every role counts, as before.
+    """
+    job = set(spec.required) | set(spec.preferred)
+    fields = {CATEGORY.get(s) for s in job} - {None, "Business & Soft Skills", "Tools"}
+    proj = set(find_skills(p.sections.get("projects", "")))
+    f.project_evidence = len({s for s in proj if CATEGORY.get(s) in fields}) >= 2
+    if p.dated_years is None:
+        return
+    rs = roles(p.sections.get("experience", ""))
+    if not rs or not any(r["body"].strip() for r in rs):
+        return
+
+    title = re.sub(r"\b(senior|sr|junior|jr|lead|principal|staff|associate|mid-level)\b\.?", "", (spec.title or "").lower()).strip()
+
+    def relevant(r) -> bool:
+        if title and title in r["header"].lower():          # same job title, e.g. "Data Engineer"
+            return True
+        text = r["header"] + "\n" + r["body"]
+        named = set(find_skills(text)) | set(find_related(text))   # named, or described without the name
+        if len(job) <= 3:
+            return bool(named & job)
+        return len({s for s in named if CATEGORY.get(s) in fields}) >= 2
+
+    keep = [r["span"] for r in rs if relevant(r)]
+    f.total_years = f.years
+    f.years = merged_years(keep) or 0.0
 
 
 def verdict_inputs(parts: dict, table: list[dict], integ: integrity.Integrity) -> dict:
@@ -644,7 +692,7 @@ def analyze(resume_text: str, jd_text: str, *, assume_skills: list[str] | None =
             "must_matched": sum(1 for r in table if r["importance"] == "must" and r["status"] in ("shown", "listed")),
             "must_related": sum(1 for r in table if r["importance"] == "must" and r["status"] == "related"),
             "nice_matched": sum(1 for r in table if r["importance"] == "nice" and r["status"] in ("shown", "listed")),
-            "years": f.years, "education": f.education_label, "word_count": f.word_count,
+            "years": f.years, "total_years": f.total_years, "education": f.education_label, "word_count": f.word_count,
             "bullets": f.n_bullets, "quantified": f.n_quant, "similarity": round(f.similarity, 3),
             "semantic": None if f.semantic is None else round(f.semantic, 3),
         },

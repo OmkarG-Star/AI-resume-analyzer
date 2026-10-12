@@ -132,33 +132,54 @@ def _month_index(token: str | None, default: int) -> int:
     return MONTHS.get(token[:3].lower(), default)
 
 
-def years_from_ranges(text: str, today: date | None = None) -> float | None:
-    """Total years covered by date ranges, with overlaps merged."""
-    today = today or date.today()
-    spans = []
-    for m in RANGE_RE.finditer(text):
-        m1, y1, m2, y2, end = m.group(1), m.group(2), m.group(3), m.group(4), m.group(5)
-        start = int(y1) * 12 + _month_index(m1, 1) - 1
-        if end:
-            stop = today.year * 12 + today.month - 1
-        elif y2:
-            stop = int(y2) * 12 + _month_index(m2, 12) - 1
-        else:
-            continue
-        if stop < start or stop - start > 45 * 12:
-            continue
-        spans.append((start, stop))
+def _span(m: re.Match, today: date) -> tuple[int, int] | None:
+    """(start, stop) in months for one date-range match, or None if implausible."""
+    m1, y1, m2, y2, end = m.group(1), m.group(2), m.group(3), m.group(4), m.group(5)
+    start = int(y1) * 12 + _month_index(m1, 1) - 1
+    if end:
+        stop = today.year * 12 + today.month - 1
+    elif y2:
+        stop = int(y2) * 12 + _month_index(m2, 12) - 1
+    else:
+        return None
+    if stop < start or stop - start > 45 * 12:
+        return None
+    return start, stop
+
+
+def merged_years(spans: list[tuple[int, int]]) -> float | None:
+    """Years covered by month spans, overlaps merged."""
     if not spans:
         return None
-    spans.sort()
+    spans = sorted(spans)
     merged = [list(spans[0])]
     for s, e in spans[1:]:
         if s <= merged[-1][1] + 1:
             merged[-1][1] = max(merged[-1][1], e)
         else:
             merged.append([s, e])
-    months = sum(e - s + 1 for s, e in merged)
-    return round(months / 12, 1)
+    return round(sum(e - s + 1 for s, e in merged) / 12, 1)
+
+
+def years_from_ranges(text: str, today: date | None = None) -> float | None:
+    """Total years covered by date ranges, with overlaps merged."""
+    today = today or date.today()
+    return merged_years([sp for m in RANGE_RE.finditer(text) if (sp := _span(m, today))])
+
+
+def roles(text: str, today: date | None = None) -> list[dict]:
+    """Dated roles in an Experience section: the header line with the dates,
+    the lines under it, and the months it covers."""
+    today = today or date.today()
+    out: list[dict] = []
+    for line in text.split("\n"):
+        m = RANGE_RE.search(line)
+        sp = _span(m, today) if m else None
+        if sp:
+            out.append({"header": line.strip(), "body": "", "span": sp})
+        elif out and line.strip():
+            out[-1]["body"] += line.strip() + "\n"
+    return out
 
 
 STATED_YEARS_RE = re.compile(r"(\d{1,2}(?:\.\d)?)\s*\+?\s*(?:years|yrs)\b(?:\s+of)?(?:\s+\w+){0,3}\s+experience", re.I)

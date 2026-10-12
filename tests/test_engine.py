@@ -52,3 +52,35 @@ def test_rewrites_are_grammatical_and_never_invent_numbers():
     assert engine.rewrite("Helped the HR team with attendance").startswith("Supported the HR team")
     out = engine.rewrite("Worked on dashboards for sales")
     assert out.startswith("Built dashboards") and "[add the result" in out
+
+
+def test_soft_skills_never_decide_the_verdict():
+    from resume_ai import jd
+    spec = jd.parse("Requirements\n- SQL and Excel\n- Clear written and verbal communication")
+    assert "Communication" not in spec.required and "Communication" in spec.preferred
+
+
+def test_only_relevant_roles_count_as_experience():
+    job = (SAMPLES / "library" / "hr_data_analyst.txt").read_text()
+    resume = ("Experience\nProduction Engineer — Acme | Jan 2018 – Dec 2024\n- Ran three shifts and cut scrap by 8%\n"
+              "Data Analyst — Beta | Jan 2025 – Present\n- Built Power BI dashboards and SQL reports for 20 managers\n"
+              "Skills\nSQL, Power BI, Excel")
+    r = engine.analyze(resume, job)
+    assert r["summary"]["total_years"] > 7 and r["summary"]["years"] < 3
+    assert any("roles that use this job's skills" in x for x in r["risks"])
+
+
+def test_shortlist_needs_most_of_the_experience():
+    job = "Requirements\n- 3+ years of experience\n- Python\n- SQL"
+    junior = ("Experience\nAnalyst — Acme | Jan 2026 – Present\n- Built Python and SQL reports for 20 teams, saving 10 hours a week\n"
+              "Skills\nPython, SQL")
+    assert engine.analyze(junior, job)["verdict"]["key"] in {"verify", "reject"}
+
+
+def test_relevant_projects_soften_missing_years():
+    job = (SAMPLES / "library" / "hr_data_analyst.txt").read_text()
+    resume = ("Experience\nTeacher — School | Jun 2017 – May 2025\n- Taught 200 students a year\n"
+              "Projects\n- Power BI dashboard on HR attrition\n- SQL analysis of 30,000 orders\nSkills\nSQL, Power BI, Excel")
+    r = engine.analyze(resume, job)
+    assert r["verdict"]["key"] != "reject" or r["score"] < 45
+    assert any("projects" in x for x in r["risks"])

@@ -787,6 +787,9 @@ body.modal-open { overflow: hidden; }
 }
 
 /* ============================================================ v2.3 interactive layer */
+.holdout { display: flex; gap: 14px; align-items: flex-start; margin-top: 14px; padding: 14px 18px; border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--green) 30%, var(--border)); background: linear-gradient(120deg, var(--green-50), var(--surface) 70%); }
+.holdout p { margin-top: 2px; max-width: 110ch; }
 /* clickable metrics */
 .clickable { cursor: pointer; }
 .clickable:focus-visible { box-shadow: var(--ring), var(--shadow-sm); }

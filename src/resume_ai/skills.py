@@ -160,6 +160,8 @@ RELATED: dict[str, list[str]] = {
               r"pub/?sub", r"real-time (?:ingestion|pipelines?|events)"],
     "Apache Spark": [r"distributed (?:compute|computing|processing|jobs?)", r"cluster computing",
                      r"compute cluster"],
+    "Data Cleaning": [r"\bclean(?:ed|ing|s)?\b(?:\s+\w+){0,3}\s+(?:data|records|datasets?)", r"de-?duplicat\w*",
+                      r"fix(?:ed|ing)\s+(?:[\d,]+\s+)?(?:\w+\s+){0,2}records", r"master data"],
     "Data Quality": [r"data (?:checks|tests)", r"validation (?:rules|checks)", r"reconcil\w+",
                      r"(?:null|duplicate|schema) checks", r"data contracts?"],
     "CI/CD": [r"automated (?:deploy\w*|tests?|testing|releases?)", r"deployment pipelines?",

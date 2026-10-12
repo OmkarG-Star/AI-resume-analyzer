@@ -1,0 +1,16 @@
+Rajat Gupta
+rajat.g@example.com | +91 90000 60606
+
+Summary
+Data professional with 12 years of experience in data engineering and data science.
+
+Experience
+Consultant — Freelance | Jan 2025 – Present
+- Worked on Python, SQL, Airflow, dbt, Snowflake, Spark, Kafka, Machine Learning, Scikit-learn, Pandas, NumPy and Power BI projects
+- Helped clients with data
+
+Skills
+Python, SQL, Airflow, dbt, Snowflake, BigQuery, Redshift, Spark, Kafka, Machine Learning, Scikit-learn, Pandas, NumPy, Statistics, Power BI, Tableau, Git, CI/CD, Docker
+
+Education
+B.Sc., 2024

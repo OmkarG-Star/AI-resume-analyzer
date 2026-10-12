@@ -1,0 +1,21 @@
+Nikhil Joshi
+nikhil.joshi@example.com | +91 98900 20202
+
+Summary
+Senior data engineer building batch and streaming platforms.
+
+Experience
+Senior Data Engineer — Tailwind Traders | Apr 2021 – Present
+- Built Airflow pipelines in Python loading 500 GB a day into Snowflake, with dbt models and tests
+- Designed star-schema data models for finance and sales used by 60 analysts
+- Ran Spark jobs on Databricks and Kafka streams for real-time inventory
+- Added data quality checks that cut broken dashboards by 80%
+- Set up CI/CD with Jenkins and Git for 40 pipelines
+Data Engineer — Tailwind Traders | Jul 2018 – Mar 2021
+- Wrote SQL and Python ETL jobs from 15 source systems into Redshift
+
+Skills
+Python, SQL, Airflow, dbt, Snowflake, Redshift, Spark, Databricks, Kafka, Git, Jenkins, AWS
+
+Education
+B.E. Computer Engineering, 2018

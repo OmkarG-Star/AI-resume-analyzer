@@ -70,8 +70,8 @@ def weighted_kappa(truth: list[str], pred: list[str]) -> float:
     return 1 - o / e if e else 0.0
 
 
-def _rows() -> list[dict]:
-    return list(csv.DictReader(open(ROOT / "eval" / "labels.csv", encoding="utf-8")))
+def _rows(labels: str = "labels.csv") -> list[dict]:
+    return list(csv.DictReader(open(ROOT / "eval" / labels, encoding="utf-8")))
 
 
 def metrics(results: list[dict]) -> dict:
@@ -104,13 +104,14 @@ def metrics(results: list[dict]) -> dict:
     }
 
 
-def run(engine=None) -> dict:
-    """Score every labelled pair with the engine as configured. `engine` defaults to this package's."""
+def run(engine=None, labels: str = "labels.csv") -> dict:
+    """Score every labelled pair with the engine as configured. `engine` defaults to this package's.
+    `labels` picks the file in eval/: labels.csv (development set) or holdout_labels.csv."""
     if engine is None:
         from . import engine
     jobs = {k: (ROOT / v).read_text(encoding="utf-8") for k, v in JOBS.items()}
     results = []
-    for r in _rows():
+    for r in _rows(labels):
         out = engine.analyze((ROOT / r["resume"]).read_text(encoding="utf-8"), jobs[r["job"]])
         results.append({**r, "score": out["score"], "verdict": out["verdict"]["label"],
                         "pred": VERDICT_CLASS[out["verdict"]["key"]]})
@@ -164,7 +165,17 @@ def build_card() -> dict | None:
                            "verdict": r["verdict"], "score": r["score"], "note": r["note"]}
                           for r in m["results"] if r["label"] != r["pred"]],
         "jobs": JOB_NAMES,
+        "holdout": _holdout(),
     }
+
+
+def _holdout() -> dict | None:
+    """Agreement on the held-out pairs, labelled before the engine ever scored them."""
+    if not (ROOT / "eval" / "holdout_labels.csv").exists():
+        return None
+    h = run(labels="holdout_labels.csv")
+    return {k: h[k] for k in ("n", "accuracy", "kappa", "spearman", "p_at_3", "false_rejections", "good",
+                              "stuffers_caught", "stuffers")}
 
 
 def write_card() -> None:

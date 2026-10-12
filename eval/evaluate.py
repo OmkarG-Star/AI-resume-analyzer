@@ -70,6 +70,7 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--src", default=str(ROOT / "src"), help="folder containing the resume_ai package")
     ap.add_argument("--write", action="store_true", help="save the report to eval/RESULTS.md")
+    ap.add_argument("--labels", default="labels.csv", help="labels file in eval/ (labels.csv or holdout_labels.csv)")
     args = ap.parse_args()
     # The engine comes from --src (so older versions can be compared); the metrics
     # code always comes from this checkout.
@@ -78,7 +79,7 @@ def main() -> None:
     spec = importlib.util.spec_from_file_location("ri_evaluation", ROOT / "src" / "resume_ai" / "evaluation.py")
     evaluation = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(evaluation)
-    text = report(evaluation.run(engine))
+    text = report(evaluation.run(engine, args.labels))
     print(text)
     if args.write:
         (ROOT / "eval" / "RESULTS.md").write_text(text, encoding="utf-8")

@@ -1,0 +1,19 @@
+Arvind Menon
+arvind.menon@example.com | +91 97400 11011
+
+Summary
+Analytics engineer.
+
+Experience
+Analytics Engineer — Litware Payments | Feb 2023 – Present
+- Built 30 dbt models with tests on BigQuery, organised as star-schema marts
+- Defined 25 shared metrics in Looker for finance and product teams
+- Reviewed pull requests in Git and wrote Python loaders for 5 vendor feeds
+Data Analyst — Litware Payments | Aug 2021 – Jan 2023
+- Wrote SQL and Looker reports for monthly business reviews
+
+Skills
+SQL, dbt, BigQuery, Looker, Data Modeling, Git, Python
+
+Education
+B.Tech Electronics, 2021

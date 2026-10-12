@@ -1,0 +1,21 @@
+Pallavi Kulkarni
+pallavi.k@example.com | +91 97300 30303
+
+Summary
+Mathematics teacher moving into analytics after an online data analytics course.
+
+Experience
+Mathematics Teacher — Greenfield School | Jun 2017 – May 2025
+- Taught mathematics to 200 students a year and ran parent meetings
+- Kept student marks in Excel and prepared term reports
+
+Projects
+- HR attrition dashboard in Power BI on a public dataset of 1,470 employees
+- SQL analysis of 30,000 retail orders to find top customer segments
+
+Skills
+Excel, Power BI, SQL, Statistics
+
+Education
+Data Analytics Certificate, 2025
+M.Sc. Mathematics, 2016

@@ -1,0 +1,19 @@
+Imran Sheikh
+imran.sheikh@example.com | +91 99870 40404
+
+Summary
+Machine learning engineer shipping models to production.
+
+Experience
+ML Engineer — Northwind Logistics | Mar 2022 – Present
+- Trained TensorFlow and Scikit-learn models for delivery-time prediction, cutting late deliveries by 12%
+- Served models as Flask APIs in Docker on AWS, handling 2 million requests a day
+- Tracked experiments in MLflow and set up CI/CD with GitHub Actions
+Data Analyst — Northwind Logistics | Jul 2020 – Feb 2022
+- Wrote SQL and Python analyses for 6 regional teams
+
+Skills
+Python, SQL, TensorFlow, Scikit-learn, Flask, Docker, MLflow, Git, AWS
+
+Education
+B.Tech Computer Science, 2020

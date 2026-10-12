@@ -979,6 +979,9 @@ const App = (() => {
       ${tile('Stuffers caught', `${ev.stuffers_caught}/${ev.stuffers}`, 'kept off the shortlist', prev ? delta(ev.stuffers_caught, prev.stuffers_caught, d => `${d}`) : '', 'Resumes that paste the job description or cram every tool into one line.', 'var(--c-orange)', 'shield', 'm-stuffers')}
       ${tile('Good candidates rejected', `${ev.false_rejections}/${ev.good}`, 'labelled shortlist or maybe', '', 'The costliest error for a screener: someone worth talking to who gets Not a fit.', 'var(--c-pink)', 'alert', 'm-fr')}
     </div>
+    ${ev.holdout ? `<div class="holdout anim"><span class="hic" style="--c:var(--c-green)">${I('shield', 16)}</span>
+      <div><b>On unseen resumes: ${(ev.holdout.accuracy * 100).toFixed(1)}% accuracy, kappa ${ev.holdout.kappa.toFixed(2)}</b>
+        <p class="small muted">A separate set of ${ev.holdout.n} resume–job pairs, labelled before the engine scored them and never used to tune it. ${ev.holdout.false_rejections} of ${ev.holdout.good} good candidates wrongly rejected; ${ev.holdout.stuffers_caught} of ${ev.holdout.stuffers} stuffers caught. This is the fairer number; the tiles above use the set the rules were designed on.</p></div></div>` : ''}
     <div class="grid g2" style="margin-top:16px">
       <section class="card anim"><div class="card-head"><div><h2><span class="hic" style="--c:var(--c-iris)">${I('table', 16)}</span>Confusion matrix</h2><p>Rows are the human label, columns the engine’s verdict. The diagonal is agreement.</p></div></div>
         <div class="card-body"><div class="cm" role="table" aria-label="Confusion matrix">
@@ -1138,7 +1141,7 @@ const App = (() => {
     if (hard.length && (vi.miss_ratio > 0.5 || score < 55)) key = 'reject';
     else if (vi.suspicious) key = score >= 48 ? 'verify' : 'reject';
     else if (score >= 74 && vi.miss_ratio <= 0.3 && vi.experience >= 0.8) key = 'strong';
-    else if (score >= 62 && vi.miss_ratio <= 0.34) key = 'shortlist';
+    else if (score >= 62 && vi.miss_ratio <= 0.34 && vi.experience >= 0.6) key = 'shortlist';
     else if (score >= 48) key = 'verify';
     else key = 'reject';
     return { key, knockouts: knock };

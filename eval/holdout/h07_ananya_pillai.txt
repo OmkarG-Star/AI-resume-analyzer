@@ -1,0 +1,20 @@
+Ananya Pillai
+ananya.pillai@example.com | +91 94400 70707
+
+Summary
+M.Sc. Data Science graduate.
+
+Projects
+- Built an employee attrition classifier in Python with Scikit-learn and Pandas on 4,000 records (AUC 0.82)
+- Power BI dashboard of HR headcount and hiring built on SQL views
+- Regression model predicting salary bands, evaluated with cross-validation
+
+Experience
+Data Science Intern — Fabrikam | Jan 2026 – Apr 2026
+- Cleaned survey data and built charts in Python for 2 HR projects
+
+Skills
+Python, Pandas, NumPy, Scikit-learn, SQL, Power BI, Statistics
+
+Education
+M.Sc. Data Science, 2026

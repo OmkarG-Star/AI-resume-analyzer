@@ -14,6 +14,8 @@ from dataclasses import dataclass
 from .parsing import EDU_LEVELS, normalise
 from .skills import find_skills, skill_spans
 
+SOFT_SKILLS = ("Communication", "Stakeholder Management", "Leadership", "Problem Solving", "Business Insights")
+
 PREFERRED_WORDS = re.compile(
     r"\b(preferred|nice[- ]to[- ]have|good[- ]to[- ]have|a plus|is a plus|bonus|desirable|"
     r"advantage|ideally|familiarity|exposure to|would be great|optional)\b", re.I)
@@ -149,6 +151,12 @@ def parse(text: str) -> JobSpec:
         seniority = "Junior"
     elif years is not None:
         seniority = "Senior" if years >= 5 else "Mid-level" if years >= 2 else "Junior"
+
+    # A resume can't prove a soft skill, so it never decides a verdict:
+    # it becomes a nice-to-have and the interview checks it.
+    for skill in SOFT_SKILLS:
+        if skill in required:
+            preferred[skill] = max(preferred.get(skill, 0), required.pop(skill))
 
     order = lambda d: sorted(d, key=lambda s: (-d[s], s))
     req = order(required)

@@ -1,0 +1,15 @@
+Sneha Rao
+sneha.rao@example.com | +91 98100 50505
+
+Summary
+Data analyst with three years in workforce reporting.
+
+Experience
+Data Analyst — Coho Healthcare | Aug 2022 – Present
+I build Tableau dashboards on attrition, absenteeism and hiring for 15 HR business partners. I write SQL against the HR data warehouse every day and clean and reconcile employee data each month, fixing around 500 records. I keep the Excel workbooks that finance uses for headcount budgets.
+
+Skills
+SQL, Tableau, Excel, Data Cleaning, HR Analytics, Communication
+
+Education
+B.Com, 2022

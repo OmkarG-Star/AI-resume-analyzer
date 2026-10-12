@@ -1,0 +1,18 @@
+Deepak Nair
+deepak.nair@example.com | +91 98450 80808
+
+Summary
+BI developer with five years in reporting and warehousing.
+
+Experience
+BI Developer — Contoso Retail | Jun 2021 – Present
+- Built SSIS ETL packages loading 30 sources into a SQL Server data warehouse
+- Designed star-schema data models for sales and HR reporting
+- Built 40 Power BI dashboards with DAX for 200 users
+- Wrote Python scripts to clean vendor files, cutting manual work by 8 hours a week
+
+Skills
+SQL, SQL Server, SSIS, Power BI, DAX, Excel, Python, Data Modeling, Data Warehousing
+
+Education
+B.E. Information Technology, 2021

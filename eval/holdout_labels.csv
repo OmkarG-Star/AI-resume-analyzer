@@ -1,0 +1,22 @@
+resume,job,label,note
+eval/holdout/h01_kavya_rao.txt,hr,shortlist,HR dashboards SQL and data cleaning
+eval/holdout/h01_kavya_rao.txt,ds,reject,no ML
+eval/holdout/h02_nikhil_joshi.txt,de,shortlist,senior DE with the exact stack
+eval/holdout/h02_nikhil_joshi.txt,ae,shortlist,dbt Snowflake star schema Git
+eval/holdout/h02_nikhil_joshi.txt,ml,reject,no ML
+eval/holdout/h03_pallavi_kulkarni.txt,hr,maybe,career changer with relevant projects only
+eval/holdout/h03_pallavi_kulkarni.txt,ds,reject,no ML or data work experience
+eval/holdout/h04_imran_sheikh.txt,ml,shortlist,production ML with MLOps
+eval/holdout/h04_imran_sheikh.txt,ds,maybe,strong ML but no HR or dashboards
+eval/holdout/h04_imran_sheikh.txt,de,reject,ML engineer
+eval/holdout/h05_sneha_rao.txt,hr,shortlist,paragraph resume meeting every requirement
+eval/holdout/h06_rajat_gupta.txt,de,reject,stuffer: crammed bullet and inflated years
+eval/holdout/h06_rajat_gupta.txt,ds,reject,stuffer: crammed bullet and inflated years
+eval/holdout/h07_ananya_pillai.txt,ds,reject,fresh graduate against 3+ years
+eval/holdout/h07_ananya_pillai.txt,hr,maybe,fresh graduate with strong projects
+eval/holdout/h08_deepak_nair.txt,de,maybe,ETL and warehousing but no Airflow dbt or cloud
+eval/holdout/h08_deepak_nair.txt,hr,shortlist,SQL Power BI and data cleaning
+eval/holdout/h09_fatima_khan.txt,ds,shortlist,meets the core ML requirements outside HR
+eval/holdout/h10_arvind_menon.txt,ae,shortlist,dbt BigQuery Looker star schema
+eval/holdout/h11_shreya_iyer.txt,hr,reject,HR generalist without SQL or dashboards
+eval/holdout/h12_varun_shah.txt,de,maybe,claims the stack but no detail under roles

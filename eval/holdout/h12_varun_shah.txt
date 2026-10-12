@@ -1,0 +1,15 @@
+Varun Shah
+varun.shah@example.com | +91 90040 13013
+
+Summary
+Data engineer.
+
+Experience
+Data Engineer — Proseware | Jan 2024 – Present
+Associate Engineer — Proseware | Jul 2023 – Dec 2023
+
+Skills
+Python, SQL, Airflow, Snowflake, dbt, Git, CI/CD, Data Modeling, Data Quality
+
+Education
+B.Tech Computer Science, 2023

@@ -1,0 +1,19 @@
+Kavya Rao
+kavya.rao@example.com | +91 98220 10101
+
+Summary
+HR data analyst who turns HRMS data into reporting leaders use.
+
+Experience
+HR Data Analyst — Blue Yonder Foods | Jan 2024 – Present
+- Built Power BI dashboards for headcount, attrition and hiring used by 30 managers
+- Wrote SQL queries on the HRMS to answer 25 ad-hoc requests a month
+- Cleaned 3,000 employee records and documented metric definitions
+HR Executive — Blue Yonder Foods | Jun 2023 – Dec 2023
+- Prepared monthly attrition MIS in Excel for 1,200 employees
+
+Skills
+SQL, Excel, Power BI, Data Cleaning, HR Analytics
+
+Education
+MBA (HR), 2023

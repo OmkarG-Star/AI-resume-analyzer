@@ -1,0 +1,21 @@
+Fatima Khan
+fatima.khan@example.com | +91 99200 90909
+
+Summary
+Data scientist in retail analytics.
+
+Experience
+Data Scientist — Wingtip Retail | May 2022 – Present
+- Built churn classification and basket-size regression models in Python with Scikit-learn, Pandas and NumPy
+- Forecasted weekly demand for 900 stores with time series models, 7% error
+- Engineered 50 features from transactions; evaluated models with cross-validation and AUC
+- Ran A/B tests and statistical analysis on 12 promotions
+- Built Tableau dashboards for 20 category managers
+Analyst — Wingtip Retail | Jun 2020 – Apr 2022
+- Wrote SQL reports on sales for 4 regions
+
+Skills
+Python, SQL, Pandas, NumPy, Scikit-learn, Statistics, Tableau, Time Series
+
+Education
+M.Sc. Statistics, 2020

@@ -128,10 +128,23 @@ The penalty is capped at 20 points. Copied text or crammed bullets also cap the 
 
 ## How accurate is it?
 
-This is a transparent rule-based scorer, not a model trained on hiring outcomes, so accuracy is measured against human labels. The set in [`eval/`](eval/) has 60 labelled resume–job pairs, including keyword stuffers, people who describe their work without naming tools, career changers and inflated claims:
+Accuracy is measured against human labels in [`eval/`](eval/): a **development set** of 60 resume–job pairs (used to design the rules) and a separate **held-out set** of 21 pairs, written and labelled before the engine scored them and never used for tuning. Both include keyword stuffers, people who describe their work without naming tools, career changers and inflated claims.
 
-| Metric | v2.1 | v2.2 |
-|---|---|---|
+| Metric | v2.1 | v2.2 | v2.3 |
+|---|---|---|---|
+| Verdict accuracy (shortlist / maybe / reject) | 76.7% | 80.0% | **90.0%** |
+| Cohen's kappa (linear-weighted) | 0.68 | 0.77 | **0.88** |
+| Spearman rho, score vs label | 0.72 | 0.84 | 0.84 |
+| Precision@3 per job | 80% | 100% | 100% |
+| Keyword stuffers kept off the shortlist | 0 of 3 | 3 of 3 | 3 of 3 |
+| Good candidates wrongly rejected | 1 of 26 | 1 of 26 | 1 of 26 |
+| **Held-out set: accuracy / kappa** | — | 71.4% / 0.70 | **81.0% / 0.80** |
+
+The held-out row is the fairer number. v2.3's gains come from meaning-based matching, treating soft skills as interview checks rather than must-haves, counting only roles that use the job's skills as experience (with relevant projects as partial credit), and requiring most of the experience for a shortlist.
+
+The resumes are fictional and the labels are the author's, so treat these figures as a regression baseline, not a real-world accuracy claim. [`eval/README.md`](eval/README.md) explains how to measure it properly with recruiter labels. The main known weakness: adjacent profiles (for example a strong ML engineer applying for an HR data scientist role) can be rejected when more than half the must-haves are missing, where a recruiter would still phone-screen them.
+
+---|---|---|
 | Verdict accuracy (shortlist / maybe / reject) | 76.7% | **80.0%** |
 | Cohen's kappa (linear-weighted) | 0.68 | **0.77** |
 | Spearman rho, score vs label | 0.72 | **0.84** |
