@@ -1,0 +1,19 @@
+Meghna Rao
+meghna.rao@example.com | +91 91111 22233
+
+Summary
+Data scientist.
+
+Experience
+Data Scientist — Self-employed | Jan 2024 – Present
+- Build and deploy machine learning models for attrition risk, hiring funnel forecasting and workforce planning
+- Own data preparation in Python and SQL, from raw HRMS extracts to clean feature tables
+- Explain model outputs to HR business partners with clear dashboards and written insights
+- Hands-on machine learning: classification, regression, feature engineering and model evaluation
+- Strong Python (Pandas, NumPy, Scikit-learn) and SQL
+
+Skills
+Python, Pandas, NumPy, Scikit-learn, SQL, Machine Learning, Classification, Regression, Feature Engineering, Model Evaluation, Power BI, Tableau, Statistics, HR Analytics
+
+Education
+B.Sc., 2023

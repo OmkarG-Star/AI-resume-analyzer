@@ -62,7 +62,7 @@ exactly which changes raise their score and by how much.
 
 | Part | Weight | What it measures |
 |---|---|---|
-| Must-have skills | 38 | Share of required skills found. **Shown in a job/project bullet = full credit; only in a skills list = 70%.** |
+| Must-have skills | 38 | Share of required skills found. **Shown in a job/project bullet = full credit; only in a skills list = 70%; work described without naming the tool = 40%.** |
 | Experience | 14 | Years from dated roles (overlaps merged) vs the job's minimum |
 | Overall relevance | 13 | TF-IDF cosine similarity between resume and job (1–2 grams) |
 | Evidence of impact | 12 | Measurable results, action-verb bullets, skills demonstrated in context |
@@ -73,6 +73,20 @@ exactly which changes raise their score and by how much.
 Parts that don't apply (e.g. no education requirement) are dropped and the rest re-weighted.
 
 **Reading the job.** Skills under *Requirements* are must-haves. Skills under *Nice to have*, or in sentences with "preferred", "bonus" or "a plus", are nice-to-haves. Skills that appear only in the duties count as nice-to-haves when the advert has an explicit requirements list. **"Power BI or Tableau" is one requirement**: either skill satisfies it.
+
+**Described, not named.** "Orchestrated DAG-based workflows" is Airflow-type work, even if the resume never says Airflow. About 20 skills have plain-language patterns like this. A match earns 40% credit, is shown as *Described, not named*, and adds an interview question asking which tool was used. It never counts as full credit.
+
+**Integrity checks.** A keyword scorer is easy to game, so three patterns are caught and explained:
+
+| Pattern | What happens |
+|---|---|
+| Lines copied from the job description | Removed before scoring; −12 points |
+| A bullet naming 6+ required tools at once | Its skills count as listed, not shown; −6 points |
+| Stated years well above the dated roles ("12 years" with 2 years of dates) | Dated years are used; −4 points |
+
+The penalty is capped at 20 points. Copied text or crammed bullets also cap the verdict at *Interview to verify*, so a person looks before deciding.
+
+**Stable scores.** Word weights for the relevance part come from a fixed reference corpus, not from the uploaded batch. The same resume gets the same score whoever else is in the pool.
 
 **Skills.** 96 canonical skills with 259 aliases across 9 categories (sklearn → Scikit-learn, Postgres → PostgreSQL), matched on token boundaries so "excellent" is not "Excel" and "mysql" is not "sql". Specific tools imply broader skills (PostgreSQL → SQL, PyTorch → Deep Learning).
 
@@ -86,6 +100,21 @@ Parts that don't apply (e.g. no education requirement) are dropped and the rest 
 | Not a fit | More than half the must-haves missing, or score < 48 |
 
 **Gains are measured, not guessed.** Each suggestion's "+points" comes from re-scoring the resume with that one fix applied.
+
+## How accurate is it?
+
+This is a transparent rule-based scorer, not a model trained on hiring outcomes, so accuracy is measured against human labels. The set in [`eval/`](eval/) has 60 labelled resume–job pairs, including keyword stuffers, people who describe their work without naming tools, career changers and inflated claims:
+
+| Metric | v2.1 | v2.2 |
+|---|---|---|
+| Verdict accuracy (shortlist / maybe / reject) | 76.7% | **80.0%** |
+| Cohen's kappa (linear-weighted) | 0.68 | **0.77** |
+| Spearman rho, score vs label | 0.72 | **0.84** |
+| Precision@3 per job | 80% | **100%** |
+| Keyword stuffers kept off the shortlist | 0 of 3 | **3 of 3** |
+| Good candidates wrongly rejected | 1 of 26 | 1 of 26 |
+
+The resumes are fictional and the labels are the author's, so treat these figures as a regression baseline, not a real-world accuracy claim. [`eval/README.md`](eval/README.md) explains how to measure it properly with recruiter labels. The main known weakness is that years are counted from every dated role, including roles outside data work, so career changers can look more experienced than they are.
 
 ---
 
@@ -108,13 +137,15 @@ frontend/            single-page app: vanilla JS, hand-built SVG, no framework o
   assets/icons.js    outline icon set drawn for this project (MIT)
 src/resume_ai/
   parsing.py         PDF/DOCX/TXT extraction, sections, years, education, PII masking
-  skills.py          taxonomy, aliases, implications, span matching
+  skills.py          taxonomy, aliases, implications, plain-language "related" phrases, span matching
+  integrity.py       copied job text, crammed bullets, inflated years claims
   jd.py              must-have / nice-to-have split, either-or groups, years, education, seniority
   engine.py          features, 7-part score, verdicts, reasons, questions, suggestions, rewrites
   store.py           job library: SQLite CRUD for job descriptions and screening counts
   api.py             FastAPI: analyze, screen, export, parse-file, /api/jobs CRUD
 samples/             job descriptions, seed job library and 6 fictional resumes
-tests/               31 pytest tests (parsing, skills, JD, engine, API, job library)
+eval/                labelled resume-job pairs and evaluate.py (accuracy, kappa, Spearman)
+tests/               38 pytest tests (parsing, skills, JD, engine, integrity, API, job library, eval baseline)
 legacy/              the original Streamlit + TF-IDF version, kept for comparison
 ```
 
@@ -133,6 +164,7 @@ Tests:
 ```bash
 pip install pytest httpx reportlab
 python -m pytest -q
+python eval/evaluate.py   # agreement with the labelled set
 ```
 
 Docker:
@@ -169,6 +201,7 @@ The library lives in SQLite at `JOBS_DB` (default `data/jobs.db`) and is seeded 
 
 ## Version history
 
+- **v2.2**: integrity checks against keyword stuffing, partial credit for work described without tool names, batch-independent scores, and an evaluation set with accuracy metrics.
 - **v2.1**: company job library: saved job descriptions with status, team and openings, live requirement preview, one-click screening and per-job counts.
 - **v2.0**: rebuilt as a two-sided product: structured job parsing, evidence-weighted scoring, verdicts with reasons, interview kit, candidate coaching with measured gains, premium web UI, tests and CI.
 - **v1.0** (`legacy/`): Streamlit app with TF-IDF cosine similarity and a fixed 28-skill list.

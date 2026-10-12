@@ -1,0 +1,20 @@
+Riya Sharma
+riya.sharma@example.com | +91 98760 54321
+
+Summary
+Fresh graduate in statistics looking for an analytics role.
+
+Projects
+- Built an employee attrition classifier in Python with Scikit-learn on 1,470 records (AUC 0.79)
+- Power BI dashboard on HR headcount and attrition for a college case competition, placed 2nd of 40
+- Cleaned and analysed 20,000 survey responses in Pandas and SQL
+
+Experience
+Intern — Datum Analytics | May 2025 – Jul 2025
+- Prepared Excel and SQL reports for 3 clients
+
+Skills
+Python, Pandas, Scikit-learn, SQL, Excel, Power BI, Statistics, Data Cleaning
+
+Education
+M.Sc. Statistics, 2026

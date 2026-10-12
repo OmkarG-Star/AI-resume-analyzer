@@ -262,7 +262,7 @@ const App = (() => {
     <section class="card anim" style="margin-top:18px">
       <div class="card-head"><div><h2><span class="hic">${I('layers')}</span>Must-have coverage across candidates</h2>
         <p>Spot the skills your pool lacks: if nobody has one, the requirement may be unrealistic for this market.</p></div>
-        <div class="legend"><span><i style="background:var(--green)"></i>Shown in work</span><span><i style="background:color-mix(in srgb,var(--amber) 55%,transparent)"></i>Listed only</span><span><i style="background:var(--surface-3)"></i>Missing</span></div></div>
+        <div class="legend"><span><i style="background:var(--green)"></i>Shown in work</span><span><i style="background:color-mix(in srgb,var(--amber) 55%,transparent)"></i>Listed only</span><span><i style="background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--amber) 45%,transparent) 0 3px,var(--surface-3) 3px 6px)"></i>Described, not named</span><span><i style="background:var(--surface-3)"></i>Missing</span></div></div>
       <div class="card-body heat">${heatmap()}</div>
     </section>
     ${S.compare.size >= 2 ? '' : ''}`;
@@ -314,7 +314,7 @@ const App = (() => {
     return `<table><thead><tr><th class="rowh">Must-have</th>${cs.map(c => `<th title="${esc(candName(c))}">${esc(S.blind ? c.id : initials(c))}</th>`).join('')}<th>Pool</th></tr></thead>
       <tbody>${S.screen.skill_coverage.map(sc => `<tr><th class="rowh">${esc(sc.skill)}</th>
         ${cs.map(c => { const row = c.skills.find(s => s.skill === sc.skill); const st = row ? row.status : 'missing';
-          return `<td class="${st}" data-tip="${esc(candName(c))}: ${st === 'shown' ? 'shown in work' : st === 'listed' ? 'listed only' : 'missing'}"></td>`; }).join('')}
+          return `<td class="${st}" data-tip="${esc(candName(c))}: ${st === 'shown' ? 'shown in work' : st === 'listed' ? 'listed only' : st === 'related' ? 'described, not named' : 'missing'}"></td>`; }).join('')}
         <td class="small muted" style="width:auto;padding-left:8px;white-space:nowrap">${sc.have}/${sc.of}</td></tr>`).join('')}</tbody></table>`;
   }
 
@@ -339,9 +339,9 @@ const App = (() => {
         ${esc(c.confidence.note)}</div></div>`;
     if (S.tab === 'skills') {
       const grp = imp => c.skills.filter(s => s.importance === imp);
-      const chipsFor = rows => rows.map(s => `<span class="chip ${s.status}" data-tip="${s.status === 'shown' ? 'Shown in a job or project bullet' : s.status === 'listed' ? 'Only in the skills list' : 'Not found'}"><i class="dot"></i>${esc(s.skill)}</span>`).join('');
+      const chipsFor = rows => rows.map(s => `<span class="chip ${s.status}" data-tip="${s.status === 'shown' ? 'Shown in a job or project bullet' : s.status === 'listed' ? 'Only in the skills list' : s.status === 'related' ? esc('Work described without naming the tool: "' + (s.evidence || '') + '"') : 'Not found'}"><i class="dot"></i>${esc(s.skill)}</span>`).join('');
       body = `
-      <div class="legend" style="margin-bottom:6px"><span><i style="background:var(--green)"></i>Shown in work</span><span><i style="background:var(--amber)"></i>Listed only</span><span><i style="background:var(--red)"></i>Missing</span></div>
+      <div class="legend" style="margin-bottom:6px"><span><i style="background:var(--green)"></i>Shown in work</span><span><i style="background:var(--amber)"></i>Listed only</span><span><i style="background:transparent;box-shadow:inset 0 0 0 1px var(--amber)"></i>Described, not named</span><span><i style="background:var(--red)"></i>Missing</span></div>
       <div class="sec-title">Must-have (${c.summary.must_matched}/${grp('must').length})</div><div class="chips">${chipsFor(grp('must'))}</div>
       <div class="sec-title">Nice-to-have (${c.summary.nice_matched}/${grp('nice').length})</div><div class="chips">${chipsFor(grp('nice')) || '<span class="muted small">None in this job</span>'}</div>
       <div class="sec-title">Other skills on the resume</div>
@@ -657,7 +657,7 @@ const App = (() => {
     const delta = base != null ? Math.round((r.score - base) * 10) / 10 : 0;
     const top3 = r.suggestions.filter(s => s.kind !== 'skill' || S.imp.assume.has(s.members?.[0])).slice(0, 3);
     const potential = Math.min(100, Math.round(r.score + r.suggestions.filter(s => s.kind !== 'skill').slice(0, 3).reduce((a, s) => a + s.gain, 0)));
-    const missing = r.skills.filter(s => s.status === 'missing' || S.imp.assume.has(s.members[0]));
+    const missing = r.skills.filter(s => s.status === 'missing' || s.status === 'related' || S.imp.assume.has(s.members[0]));
     return `
     <div class="grid g-side">
       <div class="stack">

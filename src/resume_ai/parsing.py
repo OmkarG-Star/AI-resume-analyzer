@@ -70,6 +70,8 @@ class Profile:
     word_count: int
     name_guess: str | None = None
     warnings: list[str] = field(default_factory=list)
+    dated_years: float | None = None      # from the date ranges on each role
+    stated_years: float | None = None     # from a claim such as "8 years of experience"
 
 
 # ------------------------------------------------------------------ extraction
@@ -196,10 +198,11 @@ def profile(text: str, today: date | None = None) -> Profile:
     bullets = [BULLET_RE.sub("", l).strip() for l in work.split("\n")
                if l.strip() and (BULLET_RE.match(l) or len(l.split()) >= 7)]
     exp_text = sections.get("experience") or text
-    years = years_from_ranges(exp_text, today)
+    dated = years_from_ranges(exp_text, today)
     stated = stated_years(sections.get("summary", "") + "\n" + sections.get("header", ""))
-    if stated is not None and (years is None or stated > years):
-        years = stated
+    # Dated roles are evidence; a stated total is a claim. Use the claim only when
+    # there are no dates at all, and let integrity.py flag a large gap between them.
+    years = dated if dated is not None else stated
     level, label = education(sections.get("education", text))
     warnings = []
     words = len(text.split())
@@ -213,7 +216,8 @@ def profile(text: str, today: date | None = None) -> Profile:
         has_email=bool(EMAIL_RE.search(text)),
         has_phone=any(_is_phone(m) for m in PHONE_RE.finditer(text)),
         has_links=bool(LINK_RE.search(text)), word_count=words,
-        name_guess=guess_name(text), warnings=warnings)
+        name_guess=guess_name(text), warnings=warnings,
+        dated_years=dated, stated_years=stated)
 
 
 def mask_pii(text: str) -> str:

@@ -1,0 +1,15 @@
+Amit Verma
+amit.verma@example.com | +91 90000 99887
+
+Summary
+Data scientist with 10 years of experience in machine learning and AI.
+
+Experience
+Data Analyst Intern — Coho Winery | Jan 2026 – Jun 2026
+- Helped the team with reports in Excel
+
+Skills
+Python, Machine Learning, Deep Learning, Statistics, SQL, Power BI, Tableau, Pandas, NumPy, Scikit-learn
+
+Education
+B.Sc. Computer Science, 2025

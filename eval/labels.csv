@@ -1,0 +1,61 @@
+resume,job,label,note
+samples/resumes/01_ananya_kulkarni.txt,ds,shortlist,HR ML models; meets every core requirement
+samples/resumes/05_sneha_patil.txt,ds,shortlist,people analytics lead with ML and dashboards
+samples/resumes/02_rohan_deshmukh.txt,ds,maybe,analyst with one classification model; light on ML depth
+samples/resumes/03_meera_iyer.txt,ds,maybe,strong ML but junior and no dashboards
+samples/resumes/04_kabir_shah.txt,ds,reject,skills listed with no evidence; MIS work only
+samples/resumes/06_arjun_nair.txt,ds,reject,data engineer; no ML or statistics
+samples/resumes/06_arjun_nair.txt,de,shortlist,uses the exact stack in production
+samples/resumes/01_ananya_kulkarni.txt,de,reject,data scientist; no warehouse or orchestration
+samples/resumes/05_sneha_patil.txt,de,reject,analytics profile
+samples/resumes/02_rohan_deshmukh.txt,de,reject,analyst profile
+samples/resumes/03_meera_iyer.txt,de,reject,ML profile
+samples/resumes/04_kabir_shah.txt,de,reject,MIS profile
+samples/resumes/05_sneha_patil.txt,hr,shortlist,HR analytics with SQL and dashboards
+samples/resumes/02_rohan_deshmukh.txt,hr,shortlist,SQL Power BI Excel MIS
+samples/resumes/01_ananya_kulkarni.txt,hr,shortlist,overqualified but meets every requirement
+samples/resumes/04_kabir_shah.txt,hr,maybe,Excel and MIS experience; SQL and Power BI unproven
+samples/resumes/03_meera_iyer.txt,hr,reject,ML engineer; no reporting work
+samples/resumes/06_arjun_nair.txt,hr,reject,data engineer
+samples/resumes/03_meera_iyer.txt,ml,maybe,PyTorch and NLP but under 3 years and no deployment
+samples/resumes/01_ananya_kulkarni.txt,ml,maybe,FastAPI and Docker deployment but no PyTorch or MLflow
+samples/resumes/06_arjun_nair.txt,ml,reject,no ML
+samples/resumes/02_rohan_deshmukh.txt,ml,reject,analyst
+samples/resumes/05_sneha_patil.txt,ml,reject,no deployment or deep learning
+samples/resumes/04_kabir_shah.txt,ml,reject,MIS profile
+samples/resumes/06_arjun_nair.txt,ae,shortlist,dbt and Snowflake in production
+samples/resumes/02_rohan_deshmukh.txt,ae,reject,no dbt or warehouse
+samples/resumes/01_ananya_kulkarni.txt,ae,reject,data scientist
+samples/resumes/03_meera_iyer.txt,ae,reject,ML profile
+samples/resumes/05_sneha_patil.txt,ae,reject,analytics profile
+samples/resumes/04_kabir_shah.txt,ae,reject,MIS profile
+eval/resumes/e01_vikas_rao.txt,de,maybe,strong DE work described without tool names; verify tools
+eval/resumes/e01_vikas_rao.txt,ae,maybe,star schema and SQL transformations; tools not named
+eval/resumes/e01_vikas_rao.txt,ml,reject,no ML
+eval/resumes/e02_rahul_test.txt,de,reject,stuffer: job text pasted and inflated years
+eval/resumes/e02_rahul_test.txt,ae,reject,stuffer
+eval/resumes/e03_pooja_shinde.txt,de,maybe,exact stack but just over a year of experience
+eval/resumes/e03_pooja_shinde.txt,ae,maybe,dbt and Snowflake but junior
+eval/resumes/e04_karan_mehta.txt,hr,shortlist,SQL Excel Power BI reporting
+eval/resumes/e04_karan_mehta.txt,de,reject,BI analyst
+eval/resumes/e04_karan_mehta.txt,ae,reject,no dbt or cloud warehouse
+eval/resumes/e04_karan_mehta.txt,ds,reject,no ML
+eval/resumes/e05_neha_joshi.txt,hr,shortlist,HR dashboards SQL and data cleaning
+eval/resumes/e05_neha_joshi.txt,ds,reject,no ML
+eval/resumes/e06_aditya_kulkarni.txt,ml,shortlist,production ML with the full MLOps stack
+eval/resumes/e06_aditya_kulkarni.txt,ds,maybe,strong ML but no HR or dashboards
+eval/resumes/e06_aditya_kulkarni.txt,de,reject,ML engineer
+eval/resumes/e07_sagar_more.txt,hr,maybe,career changer with relevant projects only
+eval/resumes/e07_sagar_more.txt,ds,reject,no ML experience
+eval/resumes/e08_farah_khan.txt,ds,shortlist,lead people-analytics data scientist
+eval/resumes/e08_farah_khan.txt,ml,reject,no deep learning or deployment stack
+eval/resumes/e09_amit_verma.txt,ds,reject,inflated years claim; 6-month internship
+eval/resumes/e09_amit_verma.txt,hr,reject,internship only and no evidence
+eval/resumes/e10_ishita_nair.txt,ds,shortlist,strong ML work described in plain language
+eval/resumes/e11_dev_patel.txt,de,reject,backend engineer; no data stack
+eval/resumes/e11_dev_patel.txt,ml,reject,no ML
+eval/resumes/e12_tanvi_desai.txt,ae,shortlist,dbt Snowflake star schema Looker
+eval/resumes/e12_tanvi_desai.txt,de,maybe,warehouse modelling but no orchestration
+eval/resumes/e13_meghna_test.txt,ds,reject,stuffer: job text pasted
+eval/resumes/e14_riya_sharma.txt,hr,maybe,fresh graduate with strong projects
+eval/resumes/e14_riya_sharma.txt,ds,reject,no work experience in data science

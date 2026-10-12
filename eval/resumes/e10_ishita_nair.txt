@@ -1,0 +1,21 @@
+Ishita Nair
+ishita.nair@example.com | +91 99300 44556
+
+Summary
+Data scientist working on workforce problems.
+
+Experience
+Data Scientist — Fabrikam HR Tech | Feb 2022 – Present
+- Predicted whether new hires would leave in their first year, flagging 65% of early leavers for 3,000 joiners
+- Predicted salary bands for 400 roles to support pay reviews, within 6% of market data
+- Derived 40 features from HRMS, engagement and performance data
+- Checked models with holdout sets, precision and recall before each release
+- Shared results with HR leaders through Power BI dashboards
+Analyst — Fabrikam HR Tech | Jul 2020 – Jan 2022
+- Ran statistical significance tests on survey changes; wrote SQL and Python with Pandas and NumPy
+
+Skills
+Python, SQL, Pandas, NumPy, Scikit-learn, Power BI, Statistics
+
+Education
+M.Sc. Statistics, 2020

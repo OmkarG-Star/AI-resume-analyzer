@@ -1,0 +1,21 @@
+Sagar More
+sagar.more@example.com | +91 93700 11223
+
+Summary
+Mechanical engineer moving into data analytics after a 6-month analytics program.
+
+Experience
+Production Engineer — Lamna Auto Parts | Jun 2019 – Mar 2026
+- Tracked line efficiency for 3 shifts and reduced scrap by 8%
+- Prepared daily production reports in Excel for the plant head
+
+Projects
+- HR attrition dashboard in Power BI on a public dataset of 1,470 employees
+- Sales analysis in Python with Pandas and SQL on 50,000 orders
+
+Skills
+Excel, Power BI, Python, Pandas, SQL, Statistics
+
+Education
+Data Analytics Certificate, 2026
+B.E. Mechanical Engineering, 2019

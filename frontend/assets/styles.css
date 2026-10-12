@@ -167,6 +167,7 @@ button, input, textarea, select { font: inherit; color: inherit; }
 .chip.shown   { background: var(--green-50); color: var(--green); }
 .chip.listed  { background: var(--amber-50); color: var(--amber); }
 .chip.missing { background: var(--red-50); color: var(--red); }
+.chip.related { background: transparent; color: var(--amber); box-shadow: inset 0 0 0 1px var(--amber); border-style: dashed; }
 .chip.outline { background: transparent; border-color: var(--border-strong); }
 .chip .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -311,6 +312,7 @@ input:focus, textarea:focus, select:focus { outline: none; border-color: var(--i
 .heat td.shown { background: var(--green); }
 .heat td.listed { background: color-mix(in srgb, var(--amber) 55%, transparent); }
 .heat td.missing { background: var(--surface-3); }
+.heat td.related { background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--amber) 45%, transparent) 0 3px, var(--surface-3) 3px 6px); }
 .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--text-2); }
 .legend span { display: inline-flex; align-items: center; gap: 6px; }
 .legend i { width: 12px; height: 12px; border-radius: 4px; display: inline-block; }

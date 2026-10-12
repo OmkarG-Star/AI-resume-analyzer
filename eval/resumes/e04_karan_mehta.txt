@@ -1,0 +1,19 @@
+Karan Mehta
+karan.mehta@example.com | +91 98989 12121
+
+Summary
+BI analyst with 4 years of experience in reporting for sales and finance.
+
+Experience
+BI Analyst — Wide World Importers | Jun 2022 – Present
+- Built 20 Power BI dashboards with DAX used by 150 managers
+- Wrote SQL queries on SQL Server to reconcile revenue, saving 2 days of month-end close
+- Automated Excel reports with Power Query, removing 10 manual files
+MIS Analyst — Wide World Importers | Jul 2021 – May 2022
+- Prepared weekly MIS reports in Excel for 12 branches
+
+Skills
+SQL, SQL Server, Power BI, Excel, DAX, Power Query, Data Cleaning, Communication
+
+Education
+B.Com, 2021

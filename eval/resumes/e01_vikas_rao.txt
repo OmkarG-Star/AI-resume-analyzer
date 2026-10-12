@@ -1,0 +1,22 @@
+Vikas Rao
+vikas.rao@example.com | +91 98111 22334
+
+Summary
+Data engineer who builds batch and streaming platforms.
+
+Experience
+Data Engineer — Proseware Payments | Mar 2022 – Present
+- Orchestrated DAG-based workflows with retries and SLAs for 40 pipelines in Python
+- Designed star-schema warehouse tables and fact tables used by 30 analysts
+- Wrote SQL transformations with tests in a modular SQL layer on a cloud data warehouse
+- Streamed payment events through a message broker into the lakehouse, 2 million events a day
+- Added null and duplicate checks that cut bad-data incidents by 70%
+- Set up automated deployments with GitHub Actions and code reviews on pull requests
+Software Engineer — Proseware Payments | Jul 2020 – Feb 2022
+- Built REST endpoints in Python and wrote SQL reports for finance
+
+Skills
+Python, SQL, Linux
+
+Education
+B.E. Information Technology, 2020

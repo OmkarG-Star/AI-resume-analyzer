@@ -1,0 +1,19 @@
+Neha Joshi
+neha.joshi@example.com | +91 99220 33445
+
+Summary
+HR MIS analyst with 3 years of experience in workforce reporting.
+
+Experience
+HR Analyst — Fourth Coffee | Aug 2023 – Present
+- Built Power BI dashboards for headcount, attrition and hiring used by 25 HR business partners
+- Wrote SQL queries on the HRMS database to answer 30+ ad-hoc requests a month
+- Cleaned employee master data, fixing 1,200 records and documenting metric definitions
+HR Executive (MIS) — Fourth Coffee | Jul 2022 – Jul 2023
+- Prepared monthly attendance and payroll MIS in Excel for 2,000 employees
+
+Skills
+SQL, Excel, Power BI, Data Cleaning, Data Visualization, HR Analytics, Communication
+
+Education
+MBA (HR), 2022
